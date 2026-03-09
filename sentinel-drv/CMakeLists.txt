@@ -7,6 +7,7 @@ set(WDK_WINVER "0x0A00" CACHE STRING "" FORCE)
 wdk_add_driver(sentinel-drv
     main.c
     comms.c
+    callbacks_process.c
 )
 
 target_include_directories(sentinel-drv PRIVATE ${CMAKE_SOURCE_DIR}/common)

@@ -57,21 +57,29 @@ Hooked_NtCreateThreadEx(
     SIZE_T          MaximumStackSize,
     PVOID           AttributeList)
 {
-    NTSTATUS status = Original_NtCreateThreadEx(
-        ThreadHandle, DesiredAccess, ObjectAttributes,
-        ProcessHandle, StartRoutine, Argument,
-        CreateFlags, ZeroBits, StackSize, MaximumStackSize, AttributeList);
+    NTSTATUS status;
+    __try {
+        status = Original_NtCreateThreadEx(
+            ThreadHandle, DesiredAccess, ObjectAttributes,
+            ProcessHandle, StartRoutine, Argument,
+            CreateFlags, ZeroBits, StackSize, MaximumStackSize, AttributeList);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
-    SENTINEL_HOOK_EVENT evt = {0};
-    evt.Function        = SentinelHookNtCreateThreadEx;
-    evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
-    evt.BaseAddress     = (ULONG_PTR)StartRoutine;
-    evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
-    evt.ReturnStatus    = status;
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtCreateThreadEx;
+        evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
+        evt.BaseAddress     = (ULONG_PTR)StartRoutine;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
 
-    SentinelGetCallingModule(evt.ReturnAddress,
-                             evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
-    SentinelEmitHookEvent(&evt);
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
 
     return status;
 }
@@ -86,18 +94,26 @@ Hooked_NtQueueApcThread(
     PVOID           ApcArgument2,
     PVOID           ApcArgument3)
 {
-    NTSTATUS status = Original_NtQueueApcThread(
-        ThreadHandle, ApcRoutine, ApcArgument1, ApcArgument2, ApcArgument3);
+    NTSTATUS status;
+    __try {
+        status = Original_NtQueueApcThread(
+            ThreadHandle, ApcRoutine, ApcArgument1, ApcArgument2, ApcArgument3);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
-    SENTINEL_HOOK_EVENT evt = {0};
-    evt.Function        = SentinelHookNtQueueApcThread;
-    evt.BaseAddress     = (ULONG_PTR)ApcRoutine;
-    evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
-    evt.ReturnStatus    = status;
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtQueueApcThread;
+        evt.BaseAddress     = (ULONG_PTR)ApcRoutine;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
 
-    SentinelGetCallingModule(evt.ReturnAddress,
-                             evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
-    SentinelEmitHookEvent(&evt);
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
 
     return status;
 }

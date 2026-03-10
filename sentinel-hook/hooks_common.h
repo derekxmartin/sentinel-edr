@@ -45,6 +45,40 @@ void SentinelEmitHookEvent(SENTINEL_HOOK_EVENT *evt);
  */
 const char *SentinelHookFunctionName(SENTINEL_HOOK_FUNCTION func);
 
+/*
+ * SentinelHooksSetReady / SentinelHooksAreReady
+ *   Guard flag for loader-lock safety. Hooks fire during DLL load
+ *   (NtMapViewOfSection, NtAllocateVirtualMemory called by the loader).
+ *   Events are suppressed until DllMain(PROCESS_ATTACH) completes.
+ */
+void SentinelHooksSetReady(void);
+BOOL SentinelHooksAreReady(void);
+
+/*
+ * SentinelTlsInit / SentinelTlsCleanup
+ *   Allocate/free the manual TLS index used by the reentrancy guard.
+ *   Call from DllMain PROCESS_ATTACH / PROCESS_DETACH.
+ */
+void SentinelTlsInit(void);
+void SentinelTlsCleanup(void);
+
+/*
+ * SentinelEnterHook / SentinelLeaveHook
+ *   Per-thread reentrancy guard. Prevents infinite recursion when
+ *   hook emit code (OutputDebugStringA, GetModuleHandleExW, etc.)
+ *   internally calls hooked ntdll functions.
+ *
+ *   Usage in every detour:
+ *     NTSTATUS status = Original_Nt...(args);
+ *     if (SentinelEnterHook()) {
+ *         // ... capture event ...
+ *         SentinelLeaveHook();
+ *     }
+ *     return status;
+ */
+BOOL SentinelEnterHook(void);
+void SentinelLeaveHook(void);
+
 /* ── Per-file hook installers ─────────────────────────────────────────────── */
 
 void InstallMemoryHooks(void);

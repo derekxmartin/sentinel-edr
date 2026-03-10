@@ -347,10 +347,7 @@ decode_modrm_imm8:
         BYTE modrm = *p++;
         BYTE mod = (modrm >> 6) & 3;
         BYTE rm  = modrm & 7;
-        BOOL rexB = hasRex && (rex & 0x01);
-
-        BYTE effectiveRm = rm | (rexB ? 8 : 0);
-        (void)effectiveRm; /* For future use; base rm is sufficient for SIB/disp logic */
+        BYTE sibBase = 0;
 
         if (mod == 3) {
             /* Register-direct: no SIB, no disp */
@@ -359,12 +356,13 @@ decode_modrm_imm8:
 
         /* SIB byte present when rm == 4 (not mod 3) */
         if (rm == 4) {
+            sibBase = *p & 7;
             p++; /* skip SIB */
         }
 
         if (mod == 0) {
-            if (rm == 5) {
-                /* RIP-relative or disp32 */
+            if (rm == 5 || (rm == 4 && sibBase == 5)) {
+                /* RIP-relative (rm=5) or SIB disp32 (base=5, mod=0) */
                 return (DWORD)(p - code) + 4 + 1;
             }
             return (DWORD)(p - code) + 1;
@@ -381,17 +379,19 @@ decode_modrm_imm32:
         BYTE modrm = *p++;
         BYTE mod = (modrm >> 6) & 3;
         BYTE rm  = modrm & 7;
+        BYTE sibBase = 0;
 
         if (mod == 3) {
             return (DWORD)(p - code) + 4;
         }
 
         if (rm == 4) {
+            sibBase = *p & 7;
             p++; /* SIB */
         }
 
         if (mod == 0) {
-            if (rm == 5) {
+            if (rm == 5 || (rm == 4 && sibBase == 5)) {
                 return (DWORD)(p - code) + 4 + 4;
             }
             return (DWORD)(p - code) + 4;
@@ -407,18 +407,20 @@ decode_modrm:
         BYTE modrm = *p++;
         BYTE mod = (modrm >> 6) & 3;
         BYTE rm  = modrm & 7;
+        BYTE sibBase = 0;
 
         if (mod == 3) {
             return (DWORD)(p - code);
         }
 
         if (rm == 4) {
+            sibBase = *p & 7;
             p++; /* SIB */
         }
 
         if (mod == 0) {
-            if (rm == 5) {
-                return (DWORD)(p - code) + 4; /* RIP-relative disp32 */
+            if (rm == 5 || (rm == 4 && sibBase == 5)) {
+                return (DWORD)(p - code) + 4; /* disp32 */
             }
             return (DWORD)(p - code);
         }
@@ -484,7 +486,7 @@ HookEngineInit(void)
     ZeroMemory(g_Hooks, sizeof(g_Hooks));
     g_Initialized = TRUE;
 
-    OutputDebugStringA("SentinelHook: Hook engine initialized\n");
+    /* No OutputDebugStringA here — runs under loader lock during DllMain */
     return TRUE;
 }
 
@@ -499,8 +501,6 @@ HookEngineCleanup(void)
 
     RemoveAllHooks();
     g_Initialized = FALSE;
-
-    OutputDebugStringA("SentinelHook: Hook engine cleaned up\n");
 }
 
 /* ── InstallHook ───────────────────────────────────────────────────────── */
@@ -528,20 +528,17 @@ InstallHook(
 
     /* Check if already hooked */
     if (FindHookByName(ModuleName, FunctionName)) {
-        OutputDebugStringA("SentinelHook: Function already hooked\n");
         return FALSE;
     }
 
     /* Resolve target function */
     hMod = GetModuleHandleA(ModuleName);
     if (!hMod) {
-        OutputDebugStringA("SentinelHook: Module not found\n");
         return FALSE;
     }
 
     target = GetProcAddress(hMod, FunctionName);
     if (!target) {
-        OutputDebugStringA("SentinelHook: Function not found\n");
         return FALSE;
     }
 
@@ -552,13 +549,11 @@ InstallHook(
     while (stolenSize < JMP_ABS_SIZE) {
         DWORD len = SentinelGetInstructionLength(ip + stolenSize);
         if (len == 0) {
-            OutputDebugStringA("SentinelHook: Failed to decode instruction\n");
             return FALSE;
         }
         stolenSize += len;
 
         if (stolenSize > MAX_STOLEN_BYTES) {
-            OutputDebugStringA("SentinelHook: Prologue too long\n");
             return FALSE;
         }
     }
@@ -566,7 +561,6 @@ InstallHook(
     /* Find a free slot */
     entry = FindFreeSlot();
     if (!entry) {
-        OutputDebugStringA("SentinelHook: No free hook slots\n");
         return FALSE;
     }
 
@@ -577,7 +571,6 @@ InstallHook(
         PAGE_EXECUTE_READWRITE);
 
     if (!trampoline) {
-        OutputDebugStringA("SentinelHook: VirtualAlloc failed for trampoline\n");
         return FALSE;
     }
 
@@ -602,7 +595,6 @@ InstallHook(
     if (!VirtualProtect((void *)target, stolenSize,
                         PAGE_EXECUTE_READWRITE, &oldProtect)) {
         VirtualFree(trampoline, 0, MEM_RELEASE);
-        OutputDebugStringA("SentinelHook: VirtualProtect failed\n");
         return FALSE;
     }
 
@@ -621,13 +613,7 @@ InstallHook(
     entry->Active = TRUE;
     *OriginalFunc = trampoline;
 
-    {
-        char msg[256];
-        wsprintfA(msg, "SentinelHook: Hook installed: %s!%s\n",
-                  ModuleName, FunctionName);
-        OutputDebugStringA(msg);
-    }
-
+    /* No OutputDebugStringA here — runs under loader lock during DllMain */
     return TRUE;
 }
 
@@ -669,10 +655,6 @@ RemoveHook(
     /* Clear entry */
     ZeroMemory(entry, sizeof(HOOK_ENTRY));
 
-    OutputDebugStringA("SentinelHook: Hook removed: ");
-    OutputDebugStringA(FunctionName);
-    OutputDebugStringA("\n");
-
     return TRUE;
 }
 
@@ -705,4 +687,18 @@ RemoveAllHooks(void)
             ZeroMemory(&g_Hooks[i], sizeof(HOOK_ENTRY));
         }
     }
+}
+
+/* ── HookEngineGetInstallCount ─────────────────────────────────────────── */
+
+int
+HookEngineGetInstallCount(void)
+{
+    int count = 0;
+    for (int i = 0; i < MAX_HOOKS; i++) {
+        if (g_Hooks[i].Active) {
+            count++;
+        }
+    }
+    return count;
 }

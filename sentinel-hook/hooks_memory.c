@@ -58,22 +58,30 @@ Hooked_NtAllocateVirtualMemory(
     ULONG       Protect)
 {
     /* Call original first — BaseAddress and RegionSize are IN/OUT */
-    NTSTATUS status = Original_NtAllocateVirtualMemory(
-        ProcessHandle, BaseAddress, ZeroBits, RegionSize, AllocationType, Protect);
+    NTSTATUS status;
+    __try {
+        status = Original_NtAllocateVirtualMemory(
+            ProcessHandle, BaseAddress, ZeroBits, RegionSize, AllocationType, Protect);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
-    SENTINEL_HOOK_EVENT evt = {0};
-    evt.Function        = SentinelHookNtAllocateVirtualMemory;
-    evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
-    evt.BaseAddress     = (ULONG_PTR)(BaseAddress ? *BaseAddress : 0);
-    evt.RegionSize      = RegionSize ? *RegionSize : 0;
-    evt.AllocationType  = AllocationType;
-    evt.Protection      = Protect;
-    evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
-    evt.ReturnStatus    = status;
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtAllocateVirtualMemory;
+        evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
+        evt.BaseAddress     = (ULONG_PTR)(BaseAddress ? *BaseAddress : 0);
+        evt.RegionSize      = RegionSize ? *RegionSize : 0;
+        evt.AllocationType  = AllocationType;
+        evt.Protection      = Protect;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
 
-    SentinelGetCallingModule(evt.ReturnAddress,
-                             evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
-    SentinelEmitHookEvent(&evt);
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
 
     return status;
 }
@@ -88,21 +96,29 @@ Hooked_NtProtectVirtualMemory(
     ULONG       NewProtect,
     PULONG      OldProtect)
 {
-    NTSTATUS status = Original_NtProtectVirtualMemory(
-        ProcessHandle, BaseAddress, RegionSize, NewProtect, OldProtect);
+    NTSTATUS status;
+    __try {
+        status = Original_NtProtectVirtualMemory(
+            ProcessHandle, BaseAddress, RegionSize, NewProtect, OldProtect);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
-    SENTINEL_HOOK_EVENT evt = {0};
-    evt.Function        = SentinelHookNtProtectVirtualMemory;
-    evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
-    evt.BaseAddress     = (ULONG_PTR)(BaseAddress ? *BaseAddress : 0);
-    evt.RegionSize      = RegionSize ? *RegionSize : 0;
-    evt.Protection      = NewProtect;
-    evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
-    evt.ReturnStatus    = status;
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtProtectVirtualMemory;
+        evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
+        evt.BaseAddress     = (ULONG_PTR)(BaseAddress ? *BaseAddress : 0);
+        evt.RegionSize      = RegionSize ? *RegionSize : 0;
+        evt.Protection      = NewProtect;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
 
-    SentinelGetCallingModule(evt.ReturnAddress,
-                             evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
-    SentinelEmitHookEvent(&evt);
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
 
     return status;
 }
@@ -117,21 +133,29 @@ Hooked_NtWriteVirtualMemory(
     SIZE_T      NumberOfBytesToWrite,
     PSIZE_T     NumberOfBytesWritten)
 {
-    NTSTATUS status = Original_NtWriteVirtualMemory(
-        ProcessHandle, BaseAddress, Buffer,
-        NumberOfBytesToWrite, NumberOfBytesWritten);
+    NTSTATUS status;
+    __try {
+        status = Original_NtWriteVirtualMemory(
+            ProcessHandle, BaseAddress, Buffer,
+            NumberOfBytesToWrite, NumberOfBytesWritten);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
-    SENTINEL_HOOK_EVENT evt = {0};
-    evt.Function        = SentinelHookNtWriteVirtualMemory;
-    evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
-    evt.BaseAddress     = (ULONG_PTR)BaseAddress;
-    evt.RegionSize      = NumberOfBytesToWrite;
-    evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
-    evt.ReturnStatus    = status;
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtWriteVirtualMemory;
+        evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
+        evt.BaseAddress     = (ULONG_PTR)BaseAddress;
+        evt.RegionSize      = NumberOfBytesToWrite;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
 
-    SentinelGetCallingModule(evt.ReturnAddress,
-                             evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
-    SentinelEmitHookEvent(&evt);
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
 
     return status;
 }

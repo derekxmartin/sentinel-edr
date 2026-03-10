@@ -18,12 +18,20 @@
 static void
 InstallAllHooks(void)
 {
+    char buf[256];
+
     HookEngineInit();
 
     /* P3-T2: Core injection-detection hooks */
     InstallMemoryHooks();       /* NtAllocate/Protect/WriteVirtualMemory */
     InstallThreadHooks();       /* NtCreateThreadEx, NtQueueApcThread */
     InstallSectionHooks();      /* NtMapViewOfSection */
+
+    /* OutputDebugStringA is safe here — previous crashes were caused by
+       the SIB disassembler bug (now fixed), not by debug output. */
+    wsprintfA(buf, "SentinelHook: PID=%lu hooks=%d ready\n",
+              GetCurrentProcessId(), HookEngineGetInstallCount());
+    OutputDebugStringA(buf);
 }
 
 static void
@@ -43,21 +51,27 @@ DllMain(
 {
     (void)lpReserved;
 
-    switch (dwReason) {
-    case DLL_PROCESS_ATTACH:
-        DisableThreadLibraryCalls(hModule);
-        OutputDebugStringA("SentinelHook: DLL_PROCESS_ATTACH\n");
-        InstallAllHooks();
-        break;
+    __try {
+        switch (dwReason) {
+        case DLL_PROCESS_ATTACH:
+            DisableThreadLibraryCalls(hModule);
+            SentinelTlsInit();
+            InstallAllHooks();
+            SentinelHooksSetReady();
+            break;
 
-    case DLL_PROCESS_DETACH:
-        OutputDebugStringA("SentinelHook: DLL_PROCESS_DETACH\n");
-        RemoveAllInstalledHooks();
-        break;
+        case DLL_PROCESS_DETACH:
+            RemoveAllInstalledHooks();
+            SentinelTlsCleanup();
+            break;
 
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-        break;
+        case DLL_THREAD_ATTACH:
+        case DLL_THREAD_DETACH:
+            break;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        /* Swallow exceptions — never crash the host process from DllMain */
+        return TRUE;
     }
 
     return TRUE;

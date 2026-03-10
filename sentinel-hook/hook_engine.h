@@ -61,4 +61,10 @@ BOOL RemoveHook(
  */
 void RemoveAllHooks(void);
 
+/*
+ * HookEngineGetInstallCount
+ *   Returns the number of active hooks. Diagnostic use.
+ */
+int HookEngineGetInstallCount(void);
+
 #endif /* SENTINEL_HOOK_ENGINE_H */

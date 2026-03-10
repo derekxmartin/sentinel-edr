@@ -46,24 +46,32 @@ Hooked_NtMapViewOfSection(
     ULONG           Win32Protect)
 {
     /* Call original first — BaseAddress and ViewSize are OUT */
-    NTSTATUS status = Original_NtMapViewOfSection(
-        SectionHandle, ProcessHandle, BaseAddress,
-        ZeroBits, CommitSize, SectionOffset,
-        ViewSize, InheritDisposition, AllocationType, Win32Protect);
+    NTSTATUS status;
+    __try {
+        status = Original_NtMapViewOfSection(
+            SectionHandle, ProcessHandle, BaseAddress,
+            ZeroBits, CommitSize, SectionOffset,
+            ViewSize, InheritDisposition, AllocationType, Win32Protect);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
-    SENTINEL_HOOK_EVENT evt = {0};
-    evt.Function        = SentinelHookNtMapViewOfSection;
-    evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
-    evt.BaseAddress     = (ULONG_PTR)(BaseAddress ? *BaseAddress : 0);
-    evt.RegionSize      = ViewSize ? *ViewSize : 0;
-    evt.AllocationType  = AllocationType;
-    evt.Protection      = Win32Protect;
-    evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
-    evt.ReturnStatus    = status;
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtMapViewOfSection;
+        evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
+        evt.BaseAddress     = (ULONG_PTR)(BaseAddress ? *BaseAddress : 0);
+        evt.RegionSize      = ViewSize ? *ViewSize : 0;
+        evt.AllocationType  = AllocationType;
+        evt.Protection      = Win32Protect;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
 
-    SentinelGetCallingModule(evt.ReturnAddress,
-                             evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
-    SentinelEmitHookEvent(&evt);
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
 
     return status;
 }

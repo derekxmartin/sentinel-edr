@@ -20,6 +20,7 @@
 #include <ntstrsafe.h>
 
 #include "callbacks_imageload.h"
+#include "kapc_inject.h"
 #include "constants.h"
 #include "telemetry.h"
 #include "comms.h"
@@ -187,6 +188,63 @@ SentinelImageLoadCallback(
     /* Skip PID 0 (system/idle) loads */
     if ((ULONG_PTR)ProcessId == 0) {
         return;
+    }
+
+    /*
+     * KAPC injection — two-phase approach:
+     *
+     * Phase 1 (ntdll.dll): Save the ntdll base address for this PID.
+     *   ntdll loads on the parent's thread (during NtCreateUserProcess),
+     *   so we can't queue APCs yet — KeGetCurrentThread() is wrong.
+     *
+     * Phase 2 (kernel32.dll): Resolve LdrLoadDll from saved ntdll base,
+     *   allocate shellcode, queue KAPC. By kernel32 load time, the initial
+     *   thread is executing and KeGetCurrentThread() is correct.
+     */
+    if (FullImageName && FullImageName->Buffer && FullImageName->Length > 0) {
+        USHORT  nameLen = FullImageName->Length / sizeof(WCHAR);
+        PCWCH   nameBuf = FullImageName->Buffer;
+
+        /* Phase 1: "\ntdll.dll" (10 chars) — save ntdll base */
+        if (nameLen >= 10) {
+            PCWCH tail = nameBuf + nameLen - 10;
+
+            if ((tail[0] == L'\\' || tail[0] == L'/') &&
+                (tail[1] == L'n' || tail[1] == L'N') &&
+                (tail[2] == L't' || tail[2] == L'T') &&
+                (tail[3] == L'd' || tail[3] == L'D') &&
+                (tail[4] == L'l' || tail[4] == L'L') &&
+                (tail[5] == L'l' || tail[5] == L'L') &&
+                (tail[6] == L'.') &&
+                (tail[7] == L'd' || tail[7] == L'D') &&
+                (tail[8] == L'l' || tail[8] == L'L') &&
+                (tail[9] == L'l' || tail[9] == L'L'))
+            {
+                SentinelKapcSaveNtdllBase(ProcessId, ImageInfo->ImageBase);
+            }
+        }
+
+        /* Phase 2: "\kernel32.dll" (13 chars) — inject */
+        if (nameLen >= 13) {
+            PCWCH tail = nameBuf + nameLen - 13;
+
+            if ((tail[0]  == L'\\' || tail[0]  == L'/') &&
+                (tail[1]  == L'k'  || tail[1]  == L'K') &&
+                (tail[2]  == L'e'  || tail[2]  == L'E') &&
+                (tail[3]  == L'r'  || tail[3]  == L'R') &&
+                (tail[4]  == L'n'  || tail[4]  == L'N') &&
+                (tail[5]  == L'e'  || tail[5]  == L'E') &&
+                (tail[6]  == L'l'  || tail[6]  == L'L') &&
+                (tail[7]  == L'3'                      ) &&
+                (tail[8]  == L'2'                      ) &&
+                (tail[9]  == L'.'                      ) &&
+                (tail[10] == L'd'  || tail[10] == L'D') &&
+                (tail[11] == L'l'  || tail[11] == L'L') &&
+                (tail[12] == L'l'  || tail[12] == L'L'))
+            {
+                SentinelKapcTryInject(ProcessId);
+            }
+        }
     }
 
     /* ── Allocate and fill event ────────────────────────────────────────── */

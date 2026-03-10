@@ -24,6 +24,7 @@
 #include "callbacks_thread.h"
 #include "callbacks_object.h"
 #include "callbacks_imageload.h"
+#include "kapc_inject.h"
 
 /* ── Forward declarations ────────────────────────────────────────────────── */
 
@@ -99,6 +100,7 @@ SentinelFilterUnload(
     PAGED_CODE();
 
     /* Unregister callbacks before tearing down comms (reverse init order) */
+    SentinelKapcInjectStop();
     SentinelImageLoadCallbackStop();
     SentinelObjectCallbackStop();
     SentinelThreadCallbackStop();
@@ -243,13 +245,22 @@ DriverEntry(
         goto cleanup_object_cb;
     }
 
-    /* ── Step 9: Start filtering ───────────────────────────────────────── */
+    /* ── Step 9: Initialize KAPC injection ───────────────────────────── */
+
+    status = SentinelKapcInjectInit();
+    if (!NT_SUCCESS(status)) {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "SentinelPOC: SentinelKapcInjectInit failed 0x%08X\n", status));
+        goto cleanup_imageload_cb;
+    }
+
+    /* ── Step 10: Start filtering ──────────────────────────────────────── */
 
     status = FltStartFiltering(g_FilterHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
             "SentinelPOC: FltStartFiltering failed 0x%08X\n", status));
-        goto cleanup_imageload_cb;
+        goto cleanup_kapc;
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
@@ -258,6 +269,9 @@ DriverEntry(
     return STATUS_SUCCESS;
 
     /* ── Cleanup on failure ────────────────────────────────────────────── */
+
+cleanup_kapc:
+    SentinelKapcInjectStop();
 
 cleanup_imageload_cb:
     SentinelImageLoadCallbackStop();

@@ -9,6 +9,7 @@ wdk_add_driver(sentinel-drv
     comms.c
     callbacks_process.c
     callbacks_thread.c
+    callbacks_object.c
 )
 
 target_include_directories(sentinel-drv PRIVATE ${CMAKE_SOURCE_DIR}/common)

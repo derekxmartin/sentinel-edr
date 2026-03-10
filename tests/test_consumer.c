@@ -52,6 +52,7 @@ static ULONG g_ProcessExits     = 0;
 static ULONG g_ThreadCreates    = 0;
 static ULONG g_ThreadExits      = 0;
 static ULONG g_RemoteThreads    = 0;
+static ULONG g_ObjectEvents     = 0;
 static ULONG g_Errors           = 0;
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -174,6 +175,27 @@ PrintThreadEvent(const SENTINEL_EVENT *evt)
 }
 
 static void
+PrintObjectEvent(const SENTINEL_EVENT *evt)
+{
+    const SENTINEL_OBJECT_EVENT *o = &evt->Payload.Object;
+
+    g_ObjectEvents++;
+
+    printf("  [%c] Object %s  %s  SrcPID=%-6lu SrcTID=%-6lu -> TargetPID=%-6lu\n",
+        (o->Operation == 0) ? '+' : '~',    /* Create='+', Duplicate='~' */
+        (o->ObjectType == 0) ? "Process" : "Thread",  /* Process=0, Thread=1 */
+        (o->Operation == 0) ? "HANDLE_CREATE" : "HANDLE_DUPLICATE",
+        o->SourceProcessId, o->SourceThreadId, o->TargetProcessId);
+
+    if (o->TargetImagePath[0]) {
+        printf("      Target: %ls\n", o->TargetImagePath);
+    }
+
+    printf("      DesiredAccess=0x%08lX  OriginalAccess=0x%08lX\n",
+        o->DesiredAccess, o->GrantedAccess);
+}
+
+static void
 PrintGenericEvent(const SENTINEL_EVENT *evt)
 {
     printf("  [?] Unhandled source=%d (%s)\n",
@@ -214,6 +236,9 @@ ProcessEvent(const SENTINEL_EVENT *evt)
         break;
     case SentinelSourceDriverThread:
         PrintThreadEvent(evt);
+        break;
+    case SentinelSourceDriverObject:
+        PrintObjectEvent(evt);
         break;
     default:
         PrintGenericEvent(evt);
@@ -256,6 +281,7 @@ PrintStatistics(void)
     printf("  Thread creates:         %lu\n", g_ThreadCreates);
     printf("  Thread exits:           %lu\n", g_ThreadExits);
     printf("  Remote threads:         %lu\n", g_RemoteThreads);
+    printf("  Object handle events:   %lu\n", g_ObjectEvents);
     printf("  Errors:                 %lu\n", g_Errors);
     printf("════════════════════════════════════════════════════════\n");
 }

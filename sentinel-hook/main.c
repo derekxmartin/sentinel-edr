@@ -11,33 +11,19 @@
 
 #include <windows.h>
 #include "hook_engine.h"
+#include "hooks_common.h"
 
-/* ── Test hook: kernel32!Sleep ─────────────────────────────────────────── */
-
-typedef void (WINAPI *Sleep_t)(DWORD dwMilliseconds);
-static Sleep_t OriginalSleep = NULL;
-
-static void WINAPI
-HookedSleep(DWORD dwMilliseconds)
-{
-    OutputDebugStringA("SentinelHook: Sleep intercepted\n");
-
-    /* Call original via trampoline */
-    if (OriginalSleep) {
-        OriginalSleep(dwMilliseconds);
-    }
-}
-
-/* ── Hook installation ─────────────────────────────────────────────────── */
+/* ── Hook installation ─────────────────────────────────────────────────────── */
 
 static void
 InstallAllHooks(void)
 {
     HookEngineInit();
 
-    /* Test hook: Sleep (validates engine works end-to-end) */
-    InstallHook("kernel32.dll", "Sleep",
-                (void *)HookedSleep, (void **)&OriginalSleep);
+    /* P3-T2: Core injection-detection hooks */
+    InstallMemoryHooks();       /* NtAllocate/Protect/WriteVirtualMemory */
+    InstallThreadHooks();       /* NtCreateThreadEx, NtQueueApcThread */
+    InstallSectionHooks();      /* NtMapViewOfSection */
 }
 
 static void
@@ -46,7 +32,7 @@ RemoveAllInstalledHooks(void)
     HookEngineCleanup();
 }
 
-/* ── DllMain ───────────────────────────────────────────────────────────── */
+/* ── DllMain ───────────────────────────────────────────────────────────────── */
 
 BOOL APIENTRY
 DllMain(

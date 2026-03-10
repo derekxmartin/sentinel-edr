@@ -53,6 +53,7 @@ static ULONG g_ThreadCreates    = 0;
 static ULONG g_ThreadExits      = 0;
 static ULONG g_RemoteThreads    = 0;
 static ULONG g_ObjectEvents     = 0;
+static ULONG g_ImageLoadEvents  = 0;
 static ULONG g_Errors           = 0;
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -196,6 +197,28 @@ PrintObjectEvent(const SENTINEL_EVENT *evt)
 }
 
 static void
+PrintImageLoadEvent(const SENTINEL_EVENT *evt)
+{
+    const SENTINEL_IMAGELOAD_EVENT *img = &evt->Payload.ImageLoad;
+
+    g_ImageLoadEvents++;
+
+    printf("  [+] ImageLoad  PID=%-6lu  Signed=%s  SigValid=%s\n",
+        img->ProcessId,
+        img->IsSigned ? "YES" : "NO",
+        img->IsSignatureValid ? "YES" : "NO");
+
+    if (img->ImagePath[0]) {
+        printf("      Path:  %ls\n", img->ImagePath);
+    }
+
+    printf("      Base=0x%p  Size=0x%IX  Kernel=%s\n",
+        (void *)img->ImageBase,
+        img->ImageSize,
+        img->IsKernelImage ? "YES" : "NO");
+}
+
+static void
 PrintGenericEvent(const SENTINEL_EVENT *evt)
 {
     printf("  [?] Unhandled source=%d (%s)\n",
@@ -240,6 +263,9 @@ ProcessEvent(const SENTINEL_EVENT *evt)
     case SentinelSourceDriverObject:
         PrintObjectEvent(evt);
         break;
+    case SentinelSourceDriverImageLoad:
+        PrintImageLoadEvent(evt);
+        break;
     default:
         PrintGenericEvent(evt);
         break;
@@ -282,6 +308,7 @@ PrintStatistics(void)
     printf("  Thread exits:           %lu\n", g_ThreadExits);
     printf("  Remote threads:         %lu\n", g_RemoteThreads);
     printf("  Object handle events:   %lu\n", g_ObjectEvents);
+    printf("  Image-load events:      %lu\n", g_ImageLoadEvents);
     printf("  Errors:                 %lu\n", g_Errors);
     printf("════════════════════════════════════════════════════════\n");
 }

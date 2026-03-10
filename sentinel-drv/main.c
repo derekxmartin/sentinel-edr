@@ -23,6 +23,7 @@
 #include "callbacks_process.h"
 #include "callbacks_thread.h"
 #include "callbacks_object.h"
+#include "callbacks_imageload.h"
 
 /* ── Forward declarations ────────────────────────────────────────────────── */
 
@@ -98,6 +99,7 @@ SentinelFilterUnload(
     PAGED_CODE();
 
     /* Unregister callbacks before tearing down comms (reverse init order) */
+    SentinelImageLoadCallbackStop();
     SentinelObjectCallbackStop();
     SentinelThreadCallbackStop();
     SentinelProcessCallbackStop();
@@ -232,13 +234,22 @@ DriverEntry(
         goto cleanup_thread_cb;
     }
 
-    /* ── Step 8: Start filtering ───────────────────────────────────────── */
+    /* ── Step 8: Register image-load callback ─────────────────────────── */
+
+    status = SentinelImageLoadCallbackInit();
+    if (!NT_SUCCESS(status)) {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "SentinelPOC: SentinelImageLoadCallbackInit failed 0x%08X\n", status));
+        goto cleanup_object_cb;
+    }
+
+    /* ── Step 9: Start filtering ───────────────────────────────────────── */
 
     status = FltStartFiltering(g_FilterHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
             "SentinelPOC: FltStartFiltering failed 0x%08X\n", status));
-        goto cleanup_object_cb;
+        goto cleanup_imageload_cb;
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
@@ -247,6 +258,9 @@ DriverEntry(
     return STATUS_SUCCESS;
 
     /* ── Cleanup on failure ────────────────────────────────────────────── */
+
+cleanup_imageload_cb:
+    SentinelImageLoadCallbackStop();
 
 cleanup_object_cb:
     SentinelObjectCallbackStop();

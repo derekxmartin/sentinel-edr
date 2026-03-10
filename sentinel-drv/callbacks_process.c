@@ -145,76 +145,107 @@ SentinelProcessNotifyCallback(
     _Inout_opt_ PPS_CREATE_NOTIFY_INFO CreateInfo
 )
 {
-    SENTINEL_EVENT event;
+    SENTINEL_EVENT *event;
 
-    /* Initialize event envelope */
-    SENTINEL_EVENT_INIT(event, SentinelSourceDriverProcess, SentinelSeverityInformational);
-
-    /* Fill process context (who generated the event) */
-    SentinelFillProcessContext(&event.ProcessCtx, Process, ProcessId);
-
-    if (CreateInfo != NULL) {
-        /* ── Process creation ─────────────────────────────────────────── */
-
-        event.Payload.Process.IsCreate      = TRUE;
-        event.Payload.Process.NewProcessId  = (ULONG)(ULONG_PTR)ProcessId;
-        event.Payload.Process.ParentProcessId = (ULONG)(ULONG_PTR)CreateInfo->ParentProcessId;
-        event.Payload.Process.CreatingThreadId = (ULONG)(ULONG_PTR)CreateInfo->CreatingThreadId.UniqueThread;
-
-        /* Image path from CreateInfo->ImageFileName */
-        if (CreateInfo->ImageFileName && CreateInfo->ImageFileName->Length > 0) {
-            RtlStringCchCopyNW(
-                event.Payload.Process.ImagePath,
-                SENTINEL_MAX_PATH,
-                CreateInfo->ImageFileName->Buffer,
-                CreateInfo->ImageFileName->Length / sizeof(WCHAR)
-            );
-        }
-
-        /* Command line from CreateInfo->CommandLine */
-        if (CreateInfo->CommandLine && CreateInfo->CommandLine->Length > 0) {
-            RtlStringCchCopyNW(
-                event.Payload.Process.CommandLine,
-                SENTINEL_MAX_CMDLINE,
-                CreateInfo->CommandLine->Buffer,
-                CreateInfo->CommandLine->Length / sizeof(WCHAR)
-            );
-        }
-
-        /* Token info: user SID, integrity level, elevation */
-        SentinelExtractTokenInfo(
-            Process,
-            event.Payload.Process.UserSid,
-            SENTINEL_MAX_SID_STRING,
-            &event.Payload.Process.IntegrityLevel,
-            &event.Payload.Process.IsElevated
-        );
-
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-            "SentinelPOC: Process CREATE PID=%lu PPID=%lu\n",
-            (ULONG)(ULONG_PTR)ProcessId,
-            (ULONG)(ULONG_PTR)CreateInfo->ParentProcessId));
-
-    } else {
-        /* ── Process termination ──────────────────────────────────────── */
-
-        event.Payload.Process.IsCreate      = FALSE;
-        event.Payload.Process.NewProcessId  = (ULONG)(ULONG_PTR)ProcessId;
-
-        /* Exit status is not reliably available in the callback */
-        event.Payload.Process.ExitStatus = 0;
-
-        /* Still fill the parent PID from the EPROCESS */
-        HANDLE parentPid = PsGetProcessInheritedFromUniqueProcessId(Process);
-        event.Payload.Process.ParentProcessId = (ULONG)(ULONG_PTR)parentPid;
-
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-            "SentinelPOC: Process EXIT PID=%lu\n",
-            (ULONG)(ULONG_PTR)ProcessId));
+    /*
+     * SENTINEL_EVENT is ~22 KB — far too large for the kernel stack
+     * (default 12-24 KB).  Pool-allocate to avoid stack overflow BSOD.
+     */
+    event = (SENTINEL_EVENT *)ExAllocatePool2(
+        POOL_FLAG_NON_PAGED, sizeof(SENTINEL_EVENT), SENTINEL_TAG_EVENT);
+    if (!event) {
+        return;
     }
 
-    /* Send event to agent (silently drops if no agent connected) */
-    SentinelCommsSend(&event);
+    /*
+     * Wrap in __try/__except: certain edge-case processes (System, Idle,
+     * processes being torn down) can cause access violations in token
+     * queries or EPROCESS field access.  A crash here = instant BSOD.
+     */
+    __try {
+
+        /* Initialize event envelope */
+        RtlZeroMemory(event, sizeof(SENTINEL_EVENT));
+        ExUuidCreate(&event->EventId);
+        KeQuerySystemTimePrecise(&event->Timestamp);
+        event->Source   = SentinelSourceDriverProcess;
+        event->Severity = SentinelSeverityInformational;
+
+        /* Fill process context (who generated the event) */
+        SentinelFillProcessContext(&event->ProcessCtx, Process, ProcessId);
+
+        if (CreateInfo != NULL) {
+            /* ── Process creation ─────────────────────────────────────── */
+
+            event->Payload.Process.IsCreate      = TRUE;
+            event->Payload.Process.NewProcessId  = (ULONG)(ULONG_PTR)ProcessId;
+            event->Payload.Process.ParentProcessId = (ULONG)(ULONG_PTR)CreateInfo->ParentProcessId;
+            event->Payload.Process.CreatingThreadId = (ULONG)(ULONG_PTR)CreateInfo->CreatingThreadId.UniqueThread;
+
+            /* Image path from CreateInfo->ImageFileName */
+            if (CreateInfo->ImageFileName && CreateInfo->ImageFileName->Length > 0) {
+                RtlStringCchCopyNW(
+                    event->Payload.Process.ImagePath,
+                    SENTINEL_MAX_PATH,
+                    CreateInfo->ImageFileName->Buffer,
+                    CreateInfo->ImageFileName->Length / sizeof(WCHAR)
+                );
+            }
+
+            /* Command line from CreateInfo->CommandLine */
+            if (CreateInfo->CommandLine && CreateInfo->CommandLine->Length > 0) {
+                RtlStringCchCopyNW(
+                    event->Payload.Process.CommandLine,
+                    SENTINEL_MAX_CMDLINE,
+                    CreateInfo->CommandLine->Buffer,
+                    CreateInfo->CommandLine->Length / sizeof(WCHAR)
+                );
+            }
+
+            /* Token info: user SID, integrity level, elevation */
+            SentinelExtractTokenInfo(
+                Process,
+                event->Payload.Process.UserSid,
+                SENTINEL_MAX_SID_STRING,
+                &event->Payload.Process.IntegrityLevel,
+                &event->Payload.Process.IsElevated
+            );
+
+            KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
+                "SentinelPOC: Process CREATE PID=%lu PPID=%lu\n",
+                (ULONG)(ULONG_PTR)ProcessId,
+                (ULONG)(ULONG_PTR)CreateInfo->ParentProcessId));
+
+        } else {
+            /* ── Process termination ──────────────────────────────────── */
+
+            event->Payload.Process.IsCreate      = FALSE;
+            event->Payload.Process.NewProcessId  = (ULONG)(ULONG_PTR)ProcessId;
+
+            /* Exit status is not reliably available in the callback */
+            event->Payload.Process.ExitStatus = 0;
+
+            /* Still fill the parent PID from the EPROCESS */
+            {
+                HANDLE parentPid = PsGetProcessInheritedFromUniqueProcessId(Process);
+                event->Payload.Process.ParentProcessId = (ULONG)(ULONG_PTR)parentPid;
+            }
+
+            KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
+                "SentinelPOC: Process EXIT PID=%lu\n",
+                (ULONG)(ULONG_PTR)ProcessId));
+        }
+
+        /* Send event to agent (silently drops if no agent connected) */
+        SentinelCommsSend(event);
+
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "SentinelPOC: Exception 0x%08X in process callback PID=%lu\n",
+            GetExceptionCode(), (ULONG)(ULONG_PTR)ProcessId));
+    }
+
+    ExFreePoolWithTag(event, SENTINEL_TAG_EVENT);
 }
 
 /* ── Helper: fill process context ─────────────────────────────────────────── */
@@ -249,7 +280,9 @@ SentinelFillProcessContext(
                 imageName->Length / sizeof(WCHAR)
             );
         }
-        ExFreePool(imageName);
+        if (imageName) {
+            ExFreePool(imageName);
+        }
     }
 
     /* Token info for the process context */
@@ -282,9 +315,6 @@ SentinelExtractTokenInfo(
     NTSTATUS            status;
     PACCESS_TOKEN       token = NULL;
     PTOKEN_USER         tokenUser = NULL;
-    PSID                integrityLevelSid = NULL;
-    TOKEN_ELEVATION     elevation = { 0 };
-    ULONG               returnLength = 0;
 
     /* Defaults */
     SidBuffer[0] = L'\0';
@@ -320,9 +350,11 @@ SentinelExtractTokenInfo(
 
         if (NT_SUCCESS(status) && label) {
             PSID sid = label->Label.Sid;
-            ULONG subAuthCount = *RtlSubAuthorityCountSid(sid);
-            if (subAuthCount > 0) {
-                *IntegrityLevel = *RtlSubAuthoritySid(sid, subAuthCount - 1);
+            if (sid && RtlValidSid(sid)) {
+                ULONG subAuthCount = *RtlSubAuthorityCountSid(sid);
+                if (subAuthCount > 0) {
+                    *IntegrityLevel = *RtlSubAuthoritySid(sid, subAuthCount - 1);
+                }
             }
             ExFreePool(label);
         }
@@ -330,13 +362,17 @@ SentinelExtractTokenInfo(
 
     /* ── Elevation ────────────────────────────────────────────────────── */
 
-    status = SeQueryInformationToken(
-        token, TokenElevation, (PVOID*)&elevation
-    );
-    /* SeQueryInformationToken for TokenElevation copies directly into
-     * the provided structure on some builds; handle both cases. */
-    if (NT_SUCCESS(status)) {
-        *IsElevated = (elevation.TokenIsElevated != 0);
+    {
+        PTOKEN_ELEVATION pElevation = NULL;
+
+        status = SeQueryInformationToken(
+            token, TokenElevation, (PVOID*)&pElevation
+        );
+
+        if (NT_SUCCESS(status) && pElevation) {
+            *IsElevated = (pElevation->TokenIsElevated != 0);
+            ExFreePool(pElevation);
+        }
     }
 
     PsDereferencePrimaryToken(token);

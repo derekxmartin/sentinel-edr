@@ -53,6 +53,9 @@ packages/
 .vscode/
 .idea/
 
+# Test artifacts
+Testing/
+
 # OS files
 Thumbs.db
 .DS_Store

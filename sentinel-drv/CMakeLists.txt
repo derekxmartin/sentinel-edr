@@ -8,11 +8,17 @@ wdk_add_driver(sentinel-drv
     main.c
     comms.c
     callbacks_process.c
+    callbacks_thread.c
 )
 
 target_include_directories(sentinel-drv PRIVATE ${CMAKE_SOURCE_DIR}/common)
 
 # Link FltMgr.lib for minifilter API (FltRegisterFilter, FltCreateCommunicationPort, etc.)
 target_link_libraries(sentinel-drv WDK::FLTMGR)
+
+# INTEGRITYCHECK is REQUIRED for PsSetCreateProcessNotifyRoutineEx.
+# Without this flag, the call returns STATUS_ACCESS_DENIED (0xC0000022).
+# Must use APPEND_STRING to LINK_FLAGS since FindWdk uses that property.
+set_property(TARGET sentinel-drv APPEND_STRING PROPERTY LINK_FLAGS " /INTEGRITYCHECK")
 
 message(STATUS "sentinel-drv: Configured (kernel minifilter driver)")

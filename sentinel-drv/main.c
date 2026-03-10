@@ -21,6 +21,7 @@
 #include "telemetry.h"
 #include "comms.h"
 #include "callbacks_process.h"
+#include "callbacks_thread.h"
 
 /* ── Forward declarations ────────────────────────────────────────────────── */
 
@@ -95,17 +96,18 @@ SentinelFilterUnload(
     UNREFERENCED_PARAMETER(Flags);
     PAGED_CODE();
 
-    /* Unregister callbacks before tearing down comms */
+    /* Unregister callbacks before tearing down comms (reverse order) */
+    SentinelThreadCallbackStop();
     SentinelProcessCallbackStop();
 
     /* Teardown communication port */
     SentinelCommsStop();
 
-    /* Unregister filter */
-    if (g_FilterHandle) {
-        FltUnregisterFilter(g_FilterHandle);
-        g_FilterHandle = NULL;
-    }
+    /*
+     * Do NOT call FltUnregisterFilter here — this callback is invoked
+     * BY FltUnregisterFilter (from SentinelUnload).  Re-calling it
+     * would double-unregister and corrupt the filter manager.
+     */
 
     return STATUS_SUCCESS;
 }
@@ -143,7 +145,7 @@ DriverEntry(
     UNREFERENCED_PARAMETER(RegistryPath);
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: DriverEntry v%s\n", SENTINEL_VERSION));
+        "SentinelPOC: DriverEntry v%s [minifilter+comms+callbacks]\n", SENTINEL_VERSION));
 
     DriverObject->DriverUnload = SentinelUnload;
 
@@ -201,7 +203,7 @@ DriverEntry(
         goto cleanup_filter;
     }
 
-    /* ── Step 5: Register process callback ─────────────────────────────── */
+    /* ── Step 5: Register process callback (STUB) ─────────────────────── */
 
     status = SentinelProcessCallbackInit();
     if (!NT_SUCCESS(status)) {
@@ -210,21 +212,33 @@ DriverEntry(
         goto cleanup_comms;
     }
 
-    /* ── Step 6: Start filtering ───────────────────────────────────────── */
+    /* ── Step 6: Register thread callback (STUB) ──────────────────────── */
+
+    status = SentinelThreadCallbackInit();
+    if (!NT_SUCCESS(status)) {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "SentinelPOC: SentinelThreadCallbackInit failed 0x%08X\n", status));
+        goto cleanup_process_cb;
+    }
+
+    /* ── Step 7: Start filtering ───────────────────────────────────────── */
 
     status = FltStartFiltering(g_FilterHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
             "SentinelPOC: FltStartFiltering failed 0x%08X\n", status));
-        goto cleanup_process_cb;
+        goto cleanup_thread_cb;
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Driver loaded successfully\n"));
+        "SentinelPOC: Driver loaded successfully (stub callbacks)\n"));
 
     return STATUS_SUCCESS;
 
     /* ── Cleanup on failure ────────────────────────────────────────────── */
+
+cleanup_thread_cb:
+    SentinelThreadCallbackStop();
 
 cleanup_process_cb:
     SentinelProcessCallbackStop();
@@ -265,17 +279,19 @@ SentinelUnload(
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
         "SentinelPOC: DriverUnload\n"));
 
-    /* Communication port — closed in SentinelFilterUnload via FltUnregisterFilter */
-
-    /* Unregister minifilter (triggers SentinelFilterUnload) */
+    /* Unregister minifilter (triggers SentinelFilterUnload which cleans up
+       callbacks and comms) */
     if (g_FilterHandle) {
         FltUnregisterFilter(g_FilterHandle);
         g_FilterHandle = NULL;
     }
 
     /* Delete symbolic link */
-    RtlInitUnicodeString(&symlinkName, SENTINEL_SYMLINK_NAME);
-    IoDeleteSymbolicLink(&symlinkName);
+    {
+        UNICODE_STRING symName;
+        RtlInitUnicodeString(&symName, SENTINEL_SYMLINK_NAME);
+        IoDeleteSymbolicLink(&symName);
+    }
 
     /* Delete device object */
     if (g_DeviceObject) {

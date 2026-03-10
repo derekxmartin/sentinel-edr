@@ -16,6 +16,7 @@
 
 #include "comms.h"
 #include "constants.h"
+#include "telemetry.h"
 #include "ipc.h"
 
 /* ── State ───────────────────────────────────────────────────────────────── */
@@ -146,7 +147,7 @@ SentinelCommsSend(
     _In_ const SENTINEL_EVENT* Event
 )
 {
-    SENTINEL_FILTER_MSG msg;
+    SENTINEL_FILTER_MSG *msg;
     ULONG               replyLength = 0;
     NTSTATUS            status;
 
@@ -156,18 +157,28 @@ SentinelCommsSend(
     }
 
     /*
+     * SENTINEL_FILTER_MSG contains SENTINEL_EVENT (~22 KB) — too large
+     * for the kernel stack.  Pool-allocate to avoid stack overflow.
+     */
+    msg = (SENTINEL_FILTER_MSG *)ExAllocatePool2(
+        POOL_FLAG_NON_PAGED, sizeof(SENTINEL_FILTER_MSG), SENTINEL_TAG_EVENT);
+    if (!msg) {
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    /*
      * Build the filter message.
      * The header is for protocol validation on the receiving end.
      */
-    RtlZeroMemory(&msg, sizeof(msg));
+    RtlZeroMemory(msg, sizeof(*msg));
 
-    msg.Header.Magic       = SENTINEL_IPC_MAGIC;
-    msg.Header.Version     = SENTINEL_IPC_VERSION;
-    msg.Header.Type        = (UINT16)SentinelMsgEvent;
-    msg.Header.PayloadSize = sizeof(SENTINEL_EVENT);
-    msg.Header.SequenceNum = 0;     /* Sequence tracking added later */
+    msg->Header.Magic       = SENTINEL_IPC_MAGIC;
+    msg->Header.Version     = SENTINEL_IPC_VERSION;
+    msg->Header.Type        = (UINT16)SentinelMsgEvent;
+    msg->Header.PayloadSize = sizeof(SENTINEL_EVENT);
+    msg->Header.SequenceNum = 0;     /* Sequence tracking added later */
 
-    RtlCopyMemory(&msg.Event, Event, sizeof(SENTINEL_EVENT));
+    RtlCopyMemory(&msg->Event, Event, sizeof(SENTINEL_EVENT));
 
     /*
      * FltSendMessage sends data to the user-mode port and optionally
@@ -183,8 +194,8 @@ SentinelCommsSend(
         status = FltSendMessage(
             s_Filter,
             &s_ClientPort,
-            &msg,
-            sizeof(msg),
+            msg,
+            sizeof(*msg),
             NULL,                   /* ReplyBuffer — no reply expected for events */
             &replyLength,
             &timeout
@@ -195,6 +206,8 @@ SentinelCommsSend(
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
             "SentinelPOC: FltSendMessage failed 0x%08X\n", status));
     }
+
+    ExFreePoolWithTag(msg, SENTINEL_TAG_EVENT);
 
     return status;
 }

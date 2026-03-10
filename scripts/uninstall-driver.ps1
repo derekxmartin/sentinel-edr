@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "=== SentinelPOC Driver Uninstall ===" -ForegroundColor Cyan
 Write-Host ""
 
-# ── Step 1: Stop driver ─────────────────────────────────────────────────────
+# -- Step 1: Stop driver ----------------------------------------------------------
 
 Write-Host "[1/3] Stopping driver service..." -ForegroundColor Yellow
 
@@ -52,7 +52,7 @@ if ($serviceQuery -match "STOPPED") {
     Write-Warning "Unexpected service state. Attempting to delete anyway."
 }
 
-# ── Step 2: Delete service ───────────────────────────────────────────────────
+# -- Step 2: Delete service -------------------------------------------------------
 
 Write-Host "[2/3] Deleting driver service..." -ForegroundColor Yellow
 
@@ -63,7 +63,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Warning "Failed to delete service. It may already be deleted or require a reboot."
 }
 
-# ── Step 3: Optionally disable test-signing ──────────────────────────────────
+# -- Step 3: Optionally disable test-signing --------------------------------------
 
 if ($DisableTestSigning) {
     Write-Host "[3/3] Disabling test-signing mode..." -ForegroundColor Yellow
@@ -77,7 +77,7 @@ if ($DisableTestSigning) {
     Write-Host "[3/3] Test-signing left enabled (use -DisableTestSigning to turn off)." -ForegroundColor DarkGray
 }
 
-# ── Verify ───────────────────────────────────────────────────────────────────
+# -- Verify -----------------------------------------------------------------------
 
 Write-Host ""
 Write-Host "=== Uninstall Complete ===" -ForegroundColor Cyan

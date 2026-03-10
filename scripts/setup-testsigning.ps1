@@ -14,7 +14,7 @@
 
 .NOTES
     Run from an elevated PowerShell prompt.
-    Only use on test/development VMs — never on production systems.
+    Only use on test/development VMs -- never on production systems.
 #>
 
 param(
@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "=== SentinelPOC Test-Signing Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
-# ── Step 1: Enable test-signing ──────────────────────────────────────────────
+# -- Step 1: Enable test-signing --------------------------------------------------
 
 Write-Host "[1/4] Enabling test-signing mode..." -ForegroundColor Yellow
 
@@ -43,7 +43,7 @@ if ($currentMode -match "Yes") {
     Write-Host "  Test-signing enabled. Reboot required." -ForegroundColor Green
 }
 
-# ── Step 2: Create self-signed certificate ───────────────────────────────────
+# -- Step 2: Create self-signed certificate ---------------------------------------
 
 Write-Host "[2/4] Creating self-signed code-signing certificate..." -ForegroundColor Yellow
 
@@ -63,7 +63,7 @@ if ($existingCert) {
     Write-Host "  Created certificate: $($cert.Thumbprint)" -ForegroundColor Green
 }
 
-# ── Step 3: Export certificate ───────────────────────────────────────────────
+# -- Step 3: Export certificate ---------------------------------------------------
 
 Write-Host "[3/4] Exporting certificate..." -ForegroundColor Yellow
 
@@ -75,7 +75,7 @@ $certPath = Join-Path $OutputDir "SentinelPOC-TestSign.cer"
 Export-Certificate -Cert $cert -FilePath $certPath -Force | Out-Null
 Write-Host "  Exported to: $certPath" -ForegroundColor Green
 
-# ── Step 4: Add to Trusted Root store ────────────────────────────────────────
+# -- Step 4: Add to Trusted Root store --------------------------------------------
 
 Write-Host "[4/4] Adding certificate to Trusted Root CA store..." -ForegroundColor Yellow
 
@@ -87,7 +87,7 @@ if ($rootStore) {
     Write-Host "  Added to Trusted Root store." -ForegroundColor Green
 }
 
-# ── Summary ──────────────────────────────────────────────────────────────────
+# -- Summary ----------------------------------------------------------------------
 
 Write-Host ""
 Write-Host "=== Setup Complete ===" -ForegroundColor Cyan

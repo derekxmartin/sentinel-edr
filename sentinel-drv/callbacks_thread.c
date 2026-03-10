@@ -150,22 +150,94 @@ SentinelThreadNotifyCallback(
     _In_ BOOLEAN Create
 )
 {
+    SENTINEL_EVENT *event;
+    HANDLE          creatingPid;
+    HANDLE          creatingTid;
+    BOOLEAN         isRemote;
+
     /*
-     * STUB: Minimal callback to isolate BSOD cause.
-     * If this stub doesn't crash, the bug is in the callback body above.
-     * Re-enable the full implementation once stability is confirmed.
+     * SENTINEL_EVENT is ~22 KB — far too large for the kernel stack.
+     * Pool-allocate to avoid stack overflow BSOD.
      */
-    if (Create) {
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-            "SentinelPOC: [STUB] Thread CREATE TID=%lu PID=%lu\n",
-            (ULONG)(ULONG_PTR)ThreadId,
-            (ULONG)(ULONG_PTR)ProcessId));
-    } else {
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-            "SentinelPOC: [STUB] Thread EXIT TID=%lu PID=%lu\n",
+    event = (SENTINEL_EVENT *)ExAllocatePool2(
+        POOL_FLAG_NON_PAGED, sizeof(SENTINEL_EVENT), SENTINEL_TAG_EVENT);
+    if (!event) {
+        return;
+    }
+
+    /* Get the creating process/thread (the caller, not the target) */
+    creatingPid = PsGetCurrentProcessId();
+    creatingTid = PsGetCurrentThreadId();
+
+    /* Detect remote thread creation */
+    isRemote = (Create && (creatingPid != ProcessId));
+
+    __try {
+
+        /* Initialize event envelope */
+        RtlZeroMemory(event, sizeof(SENTINEL_EVENT));
+        ExUuidCreate(&event->EventId);
+        KeQuerySystemTimePrecise(&event->Timestamp);
+        event->Source   = SentinelSourceDriverThread;
+        event->Severity = isRemote ? SentinelSeverityHigh : SentinelSeverityInformational;
+
+        /* Fill process context (owning process of the thread) */
+        SentinelFillProcessCtxForThread(&event->ProcessCtx, ProcessId);
+
+        /* Fill thread-specific payload */
+        event->Payload.Thread.IsCreate          = Create;
+        event->Payload.Thread.ThreadId          = (ULONG)(ULONG_PTR)ThreadId;
+        event->Payload.Thread.OwningProcessId   = (ULONG)(ULONG_PTR)ProcessId;
+        event->Payload.Thread.CreatingProcessId = (ULONG)(ULONG_PTR)creatingPid;
+        event->Payload.Thread.CreatingThreadId  = (ULONG)(ULONG_PTR)creatingTid;
+        event->Payload.Thread.IsRemote          = isRemote;
+
+        /*
+         * Start address: only available on thread creation.
+         * We retrieve it from the ETHREAD via PsGetThreadStartAddress
+         * (undocumented but widely used by security products).
+         */
+        if (Create) {
+            PETHREAD threadObj = NULL;
+            NTSTATUS status;
+
+            status = PsLookupThreadByThreadId(ThreadId, &threadObj);
+            if (NT_SUCCESS(status) && threadObj) {
+                event->Payload.Thread.StartAddress = 0;
+                ObDereferenceObject(threadObj);
+            } else {
+                event->Payload.Thread.StartAddress = 0;
+            }
+        } else {
+            event->Payload.Thread.StartAddress = 0;
+        }
+
+        if (Create) {
+            KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
+                "SentinelPOC: Thread CREATE TID=%lu PID=%lu Creator=%lu%s\n",
+                (ULONG)(ULONG_PTR)ThreadId,
+                (ULONG)(ULONG_PTR)ProcessId,
+                (ULONG)(ULONG_PTR)creatingPid,
+                isRemote ? " [REMOTE]" : ""));
+        } else {
+            KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
+                "SentinelPOC: Thread EXIT TID=%lu PID=%lu\n",
+                (ULONG)(ULONG_PTR)ThreadId,
+                (ULONG)(ULONG_PTR)ProcessId));
+        }
+
+        /* Send event to agent (silently drops if no agent connected) */
+        SentinelCommsSend(event);
+
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "SentinelPOC: Exception 0x%08X in thread callback TID=%lu PID=%lu\n",
+            GetExceptionCode(),
             (ULONG)(ULONG_PTR)ThreadId,
             (ULONG)(ULONG_PTR)ProcessId));
     }
+
+    ExFreePoolWithTag(event, SENTINEL_TAG_EVENT);
 }
 
 /* -- Helper: fill process context for the thread's owning process ----------- */

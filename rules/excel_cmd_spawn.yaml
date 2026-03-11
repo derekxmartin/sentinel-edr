@@ -1,0 +1,15 @@
+# Detection: Excel spawns cmd.exe
+# ATT&CK: T1059.003 - Command and Scripting Interpreter: Windows Command Shell
+# Detects a command shell spawned from Microsoft Excel (macro execution indicator)
+
+name: Excel spawns cmd.exe
+source: DriverProcess
+severity: medium
+action: LOG
+conditions:
+  - field: payload.imagePath
+    op: contains
+    value: cmd.exe
+  - field: process.imagePath
+    op: contains
+    value: excel.exe

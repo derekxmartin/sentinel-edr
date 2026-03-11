@@ -3,10 +3,12 @@
  * Event processing orchestrator implementation.
  *
  * P4-T2: Event Processing & JSON Logging.
+ * P4-T3: Single-Event Rule Engine.
  */
 
 #include "event_processor.h"
 #include <cstdio>
+#include <vector>
 
 /* ── Init / Shutdown ─────────────────────────────────────────────────────── */
 
@@ -14,6 +16,10 @@ bool
 EventProcessor::Init(const char* logPath)
 {
     m_eventsProcessed = 0;
+
+    /* Load detection rules */
+    m_ruleEngine.Init("C:\\SentinelPOC\\rules");
+
     return m_jsonWriter.Open(logPath);
 }
 
@@ -33,14 +39,31 @@ EventProcessor::Process(const SENTINEL_EVENT& evt)
     /* 1. Update process table from this event */
     m_processTable.OnEvent(evt);
 
-    /* 2. Enrich: look up parent image path */
+    /* 2. Evaluate detection rules */
+    std::vector<SENTINEL_EVENT> alerts;
+    m_ruleEngine.Evaluate(evt, m_processTable, alerts);
+
+    /* 3. Enrich: look up parent image path */
     std::wstring parentImagePath = m_processTable.GetParentImagePath(evt);
 
-    /* 3. Write JSON to log file */
+    /* 4. Write JSON to log file */
     m_jsonWriter.WriteEvent(evt, parentImagePath);
 
-    /* 4. Print summary to stdout for console mode */
+    /* 5. Print summary to stdout for console mode */
     PrintSummary(evt);
+
+    /* 6. Process alert events (write to log + print) */
+    for (const auto& alert : alerts) {
+        m_eventsProcessed++;
+        std::wstring alertParent = m_processTable.GetParentImagePath(alert);
+        m_jsonWriter.WriteEvent(alert, alertParent);
+
+        std::printf("  ** ALERT: [%s] rule=%s trigger=%s pid=%lu\n",
+                    SeverityName(alert.Severity),
+                    alert.Payload.Alert.RuleName,
+                    SourceName(alert.Payload.Alert.TriggerSource),
+                    alert.ProcessCtx.ProcessId);
+    }
 }
 
 /* ── Console summary ─────────────────────────────────────────────────────── */

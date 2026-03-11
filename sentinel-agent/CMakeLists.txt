@@ -8,9 +8,14 @@ add_executable(sentinel-agent
     event_processor.cpp
     process_table.cpp
     json_writer.cpp
+    rules/rule_engine.cpp
+    rules/rule_parser.cpp
 )
 
-target_include_directories(sentinel-agent PRIVATE ${CMAKE_SOURCE_DIR}/common)
+target_include_directories(sentinel-agent PRIVATE
+    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 # fltLib.lib — FilterConnectCommunicationPort, FilterGetMessage
 # advapi32.lib — Service control manager, token queries

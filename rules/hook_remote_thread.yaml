@@ -1,0 +1,15 @@
+# Detection: Remote thread creation
+# ATT&CK: T1055.003 - Thread Execution Hijacking
+# Detects NtCreateThreadEx targeting a different process
+
+name: Remote thread creation
+source: HookDll
+severity: high
+action: LOG
+conditions:
+  - field: payload.function
+    op: equals
+    value: NtCreateThreadEx
+  - field: payload.targetPid
+    op: greater-than
+    value: "0"

@@ -9,10 +9,11 @@ add_library(sentinel-hook SHARED
     hooks_thread.c
     hooks_section.c
     hooks_process.c
+    pipe_client.c
 )
 
 target_include_directories(sentinel-hook PRIVATE ${CMAKE_SOURCE_DIR}/common)
-target_link_libraries(sentinel-hook PRIVATE ole32.lib)
+target_link_libraries(sentinel-hook PRIVATE ole32.lib advapi32.lib)
 set_target_properties(sentinel-hook PROPERTIES
     C_STANDARD 17
     OUTPUT_NAME "sentinel-hook"

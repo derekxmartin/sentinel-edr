@@ -8,11 +8,13 @@
  * P3-T1: Hook engine skeleton with Sleep test hook.
  * P3-T2: Core injection-detection hooks (NtAllocateVirtualMemory, etc.)
  * P3-T3: Remaining hooks + stack hash computation.
+ * P3-T4: Named pipe client (ring buffer → agent pipe).
  */
 
 #include <windows.h>
 #include "hook_engine.h"
 #include "hooks_common.h"
+#include "pipe_client.h"
 
 /* ── Hook installation ─────────────────────────────────────────────────────── */
 
@@ -60,14 +62,14 @@ DllMain(
         case DLL_PROCESS_ATTACH:
             DisableThreadLibraryCalls(hModule);
             SentinelTlsInit();
-            SentinelLogInit();
+            SentinelPipeClientInit();
             InstallAllHooks();
             SentinelHooksSetReady();
             break;
 
         case DLL_PROCESS_DETACH:
             RemoveAllInstalledHooks();
-            SentinelLogCleanup();
+            SentinelPipeClientShutdown();
             SentinelTlsCleanup();
             break;
 

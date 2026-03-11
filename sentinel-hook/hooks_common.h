@@ -5,7 +5,7 @@
  * Provides:
  *   - Target PID resolution from process handle
  *   - Calling module lookup from return address (loader-lock-safe)
- *   - Hook event emission (file log for now, named pipe in P3-T4)
+ *   - Hook event emission (ring buffer → named pipe via pipe_client)
  *   - Per-thread reentrancy guard (manual TLS)
  *   - Stack hash computation (disabled — deadlocks under loader lock)
  */
@@ -37,8 +37,8 @@ void SentinelGetCallingModule(
 
 /*
  * SentinelEmitHookEvent
- *   Emit a hook event to the diagnostic log file.
- *   P3-T4 will replace this with named pipe send to the agent.
+ *   Push a hook event into the pipe client ring buffer.
+ *   The background worker thread serializes and sends to the agent.
  */
 void SentinelEmitHookEvent(SENTINEL_HOOK_EVENT *evt);
 
@@ -66,13 +66,14 @@ void SentinelTlsInit(void);
 void SentinelTlsCleanup(void);
 
 /*
- * SentinelLogInit / SentinelLogCleanup
- *   Pre-open/close the event log file handle. Using a persistent handle
- *   avoids CreateFileA/CloseHandle per event (too much overhead during
- *   process startup when hundreds of hooks fire).
+ * SentinelCaptureStackHash
+ *   Compute a hash of the current call stack for behavioral correlation.
+ *
+ *   CURRENTLY DISABLED: RtlCaptureStackBackTrace deadlocks under loader
+ *   lock (RtlVirtualUnwind acquires SRW lock for .pdata function tables).
+ *   Returns 0 until loader-lock detection is added or deferred to agent.
  */
-void SentinelLogInit(void);
-void SentinelLogCleanup(void);
+ULONG SentinelCaptureStackHash(void);
 
 /*
  * SentinelEnterHook / SentinelLeaveHook
@@ -96,15 +97,5 @@ void InstallMemoryHooks(void);
 void InstallThreadHooks(void);
 void InstallSectionHooks(void);
 void InstallProcessHooks(void);
-
-/*
- * SentinelCaptureStackHash
- *   Compute a hash of the current call stack for behavioral correlation.
- *
- *   CURRENTLY DISABLED: RtlCaptureStackBackTrace deadlocks under loader
- *   lock (RtlVirtualUnwind acquires SRW lock for .pdata function tables).
- *   Returns 0 until P3-T4 adds loader-lock detection or defers to agent.
- */
-ULONG SentinelCaptureStackHash(void);
 
 #endif /* SENTINEL_HOOKS_COMMON_H */

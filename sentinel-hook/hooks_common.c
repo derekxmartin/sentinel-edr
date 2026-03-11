@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <intrin.h>
 #include "hooks_common.h"
+#include "pipe_client.h"
 
 /*
  * Guard flag: hooks fire during DLL load (NtMapViewOfSection, NtAllocateVirtualMemory
@@ -178,73 +179,17 @@ SentinelCaptureStackHash(void)
     return 0;
 }
 
-/* ── Diagnostic file log ──────────────────────────────────────────────────── */
-
-/*
- * Pre-opened log file handle. Opened once during SentinelLogInit(),
- * closed during SentinelLogCleanup(). Avoids CreateFileA/CloseHandle
- * per event which causes too much overhead during process startup
- * (hundreds of hook events fire during DLL loading).
- */
-static HANDLE g_hLogFile = INVALID_HANDLE_VALUE;
-
-void
-SentinelLogInit(void)
-{
-    g_hLogFile = CreateFileA(
-        "C:\\SentinelPOC\\hook_event.log",
-        FILE_APPEND_DATA,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        NULL,
-        OPEN_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL,
-        NULL);
-}
-
-void
-SentinelLogCleanup(void)
-{
-    if (g_hLogFile != INVALID_HANDLE_VALUE) {
-        CloseHandle(g_hLogFile);
-        g_hLogFile = INVALID_HANDLE_VALUE;
-    }
-}
-
-static void
-SentinelLogToFile(const char *msg)
-{
-    if (g_hLogFile != INVALID_HANDLE_VALUE) {
-        DWORD written;
-        WriteFile(g_hLogFile, msg, (DWORD)lstrlenA(msg), &written, NULL);
-    }
-}
-
 /* ── SentinelEmitHookEvent ────────────────────────────────────────────────── */
 
 /*
- * P3-T2: Log hook events to diagnostic file.
- * P3-T4 will replace this with named pipe send to the agent.
+ * P3-T4: Push hook events to the pipe client ring buffer.
+ * The background worker thread handles serialization and pipe I/O.
  *
- * Uses _snprintf_s (CRT) instead of wsprintfA (user32) to avoid
- * deadlock under loader lock. OutputDebugStringA also removed
- * (acquires DBWIN mutex — unsafe under loader lock).
+ * This function is loader-lock safe — SentinelPipeClientPush uses only
+ * InterlockedIncrement, memcpy, GetSystemTimePreciseAsFileTime, SetEvent.
  */
 void
 SentinelEmitHookEvent(SENTINEL_HOOK_EVENT *evt)
 {
-    char msg[512];
-
-    _snprintf_s(msg, sizeof(msg), _TRUNCATE,
-        "SentinelHook: %s targetPid=%lu addr=0x%p size=0x%Ix "
-        "prot=0x%lX alloc=0x%lX stackHash=0x%08lX status=0x%08lX\n",
-        SentinelHookFunctionName(evt->Function),
-        evt->TargetProcessId,
-        (void *)evt->BaseAddress,
-        evt->RegionSize,
-        evt->Protection,
-        evt->AllocationType,
-        evt->StackHash,
-        evt->ReturnStatus);
-
-    SentinelLogToFile(msg);
+    SentinelPipeClientPush(evt);
 }

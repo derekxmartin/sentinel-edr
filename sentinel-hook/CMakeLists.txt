@@ -8,6 +8,7 @@ add_library(sentinel-hook SHARED
     hooks_memory.c
     hooks_thread.c
     hooks_section.c
+    hooks_process.c
 )
 
 target_include_directories(sentinel-hook PRIVATE ${CMAKE_SOURCE_DIR}/common)

@@ -7,6 +7,7 @@
  *
  * P3-T1: Hook engine skeleton with Sleep test hook.
  * P3-T2: Core injection-detection hooks (NtAllocateVirtualMemory, etc.)
+ * P3-T3: Remaining hooks + stack hash computation.
  */
 
 #include <windows.h>
@@ -23,12 +24,15 @@ InstallAllHooks(void)
     HookEngineInit();
 
     /* P3-T2: Core injection-detection hooks */
-    InstallMemoryHooks();       /* NtAllocate/Protect/WriteVirtualMemory */
-    InstallThreadHooks();       /* NtCreateThreadEx, NtQueueApcThread */
-    InstallSectionHooks();      /* NtMapViewOfSection */
+    InstallMemoryHooks();       /* NtAllocate/Protect/Write/ReadVirtualMemory */
+    InstallThreadHooks();       /* NtCreateThreadEx, NtQueueApcThread, NtSuspend/ResumeThread */
+    InstallSectionHooks();      /* NtMap/UnmapViewOfSection, NtCreateSection */
 
-    /* OutputDebugStringA is safe here — previous crashes were caused by
-       the SIB disassembler bug (now fixed), not by debug output. */
+    /* P3-T3: Process hooks */
+    InstallProcessHooks();      /* NtOpenProcess */
+
+    /* One-time init log — wsprintfA/OutputDebugStringA are safe here
+       because hooks haven't been armed yet (g_HooksReady is FALSE). */
     wsprintfA(buf, "SentinelHook: PID=%lu hooks=%d ready\n",
               GetCurrentProcessId(), HookEngineGetInstallCount());
     OutputDebugStringA(buf);
@@ -56,12 +60,14 @@ DllMain(
         case DLL_PROCESS_ATTACH:
             DisableThreadLibraryCalls(hModule);
             SentinelTlsInit();
+            SentinelLogInit();
             InstallAllHooks();
             SentinelHooksSetReady();
             break;
 
         case DLL_PROCESS_DETACH:
             RemoveAllInstalledHooks();
+            SentinelLogCleanup();
             SentinelTlsCleanup();
             break;
 

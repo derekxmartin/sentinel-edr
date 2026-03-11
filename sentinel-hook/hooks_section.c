@@ -3,7 +3,9 @@
  * Detour functions for section-related ntdll hooks (Ch. 2).
  *
  * Hooks:
- *   NtMapViewOfSection — section mapping (process hollowing, DLL injection)
+ *   NtMapViewOfSection   — section mapping (process hollowing, DLL injection)
+ *   NtUnmapViewOfSection — section unmapping (unloading mapped images)
+ *   NtCreateSection       — section creation (precursor to mapping)
  */
 
 #include <windows.h>
@@ -26,9 +28,26 @@ typedef NTSTATUS (NTAPI *NtMapViewOfSection_t)(
     ULONG           Win32Protect
 );
 
+typedef NTSTATUS (NTAPI *NtUnmapViewOfSection_t)(
+    HANDLE          ProcessHandle,
+    PVOID           BaseAddress
+);
+
+typedef NTSTATUS (NTAPI *NtCreateSection_t)(
+    PHANDLE         SectionHandle,
+    ACCESS_MASK     DesiredAccess,
+    PVOID           ObjectAttributes,       /* POBJECT_ATTRIBUTES */
+    PLARGE_INTEGER  MaximumSize,
+    ULONG           SectionPageProtection,
+    ULONG           AllocationAttributes,
+    HANDLE          FileHandle
+);
+
 /* ── Trampoline pointers ──────────────────────────────────────────────────── */
 
 static NtMapViewOfSection_t     Original_NtMapViewOfSection     = NULL;
+static NtUnmapViewOfSection_t   Original_NtUnmapViewOfSection   = NULL;
+static NtCreateSection_t        Original_NtCreateSection        = NULL;
 
 /* ── Detour: NtMapViewOfSection ───────────────────────────────────────────── */
 
@@ -66,6 +85,78 @@ Hooked_NtMapViewOfSection(
         evt.Protection      = Win32Protect;
         evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
         evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
+
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
+
+    return status;
+}
+
+/* ── Detour: NtUnmapViewOfSection ─────────────────────────────────────────── */
+
+static NTSTATUS NTAPI
+Hooked_NtUnmapViewOfSection(
+    HANDLE          ProcessHandle,
+    PVOID           BaseAddress)
+{
+    NTSTATUS status;
+    __try {
+        status = Original_NtUnmapViewOfSection(ProcessHandle, BaseAddress);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtUnmapViewOfSection;
+        evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
+        evt.BaseAddress     = (ULONG_PTR)BaseAddress;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
+
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
+
+    return status;
+}
+
+/* ── Detour: NtCreateSection ──────────────────────────────────────────────── */
+
+static NTSTATUS NTAPI
+Hooked_NtCreateSection(
+    PHANDLE         SectionHandle,
+    ACCESS_MASK     DesiredAccess,
+    PVOID           ObjectAttributes,
+    PLARGE_INTEGER  MaximumSize,
+    ULONG           SectionPageProtection,
+    ULONG           AllocationAttributes,
+    HANDLE          FileHandle)
+{
+    NTSTATUS status;
+    __try {
+        status = Original_NtCreateSection(
+            SectionHandle, DesiredAccess, ObjectAttributes,
+            MaximumSize, SectionPageProtection, AllocationAttributes, FileHandle);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtCreateSection;
+        evt.Protection      = SectionPageProtection;
+        evt.AllocationType  = AllocationAttributes;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
 
         SentinelGetCallingModule(evt.ReturnAddress,
                                  evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
@@ -84,4 +175,12 @@ InstallSectionHooks(void)
     InstallHook("ntdll.dll", "NtMapViewOfSection",
                 (void *)Hooked_NtMapViewOfSection,
                 (void **)&Original_NtMapViewOfSection);
+
+    InstallHook("ntdll.dll", "NtUnmapViewOfSection",
+                (void *)Hooked_NtUnmapViewOfSection,
+                (void **)&Original_NtUnmapViewOfSection);
+
+    InstallHook("ntdll.dll", "NtCreateSection",
+                (void *)Hooked_NtCreateSection,
+                (void **)&Original_NtCreateSection);
 }

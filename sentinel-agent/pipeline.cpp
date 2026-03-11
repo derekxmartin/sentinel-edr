@@ -20,6 +20,7 @@
 #include <atomic>
 
 #include "pipeline.h"
+#include "event_processor.h"
 #include "ipc.h"
 #include "ipc_serialize.h"
 #include "constants.h"
@@ -86,10 +87,10 @@ static std::thread          g_ProcessorThread;
 static std::vector<std::thread> g_ClientThreads;
 static std::mutex           g_ClientThreadsMutex;
 
-/* Event log file */
-static HANDLE               g_hEventLog = INVALID_HANDLE_VALUE;
+/* Event processor */
+static EventProcessor       g_EventProcessor;
 
-/* ── Helper: Log a message ────────────────────────────────────────────────── */
+/* ── Helper: Log a status message to stdout ──────────────────────────────── */
 
 static void
 AgentLog(const char* fmt, ...)
@@ -100,58 +101,7 @@ AgentLog(const char* fmt, ...)
     _vsnprintf_s(buf, sizeof(buf), _TRUNCATE, fmt, args);
     va_end(args);
 
-    /* Always print to stdout (console mode) */
     std::printf("%s", buf);
-
-    /* Also write to log file if open */
-    if (g_hEventLog != INVALID_HANDLE_VALUE) {
-        DWORD written;
-        WriteFile(g_hEventLog, buf, (DWORD)strlen(buf), &written, nullptr);
-    }
-}
-
-/* ── Helper: Hook function name ───────────────────────────────────────────── */
-
-static const char* g_HookFuncNames[] = {
-    "NtAllocateVirtualMemory",
-    "NtProtectVirtualMemory",
-    "NtWriteVirtualMemory",
-    "NtReadVirtualMemory",
-    "NtCreateThreadEx",
-    "NtMapViewOfSection",
-    "NtUnmapViewOfSection",
-    "NtQueueApcThread",
-    "NtOpenProcess",
-    "NtSuspendThread",
-    "NtResumeThread",
-    "NtCreateSection",
-};
-
-static const char*
-HookFunctionName(int func)
-{
-    if (func >= 0 && func < (int)(sizeof(g_HookFuncNames) / sizeof(g_HookFuncNames[0]))) {
-        return g_HookFuncNames[func];
-    }
-    return "Unknown";
-}
-
-/* ── Helper: Event source name ────────────────────────────────────────────── */
-
-static const char* g_SourceNames[] = {
-    "DriverProcess", "DriverThread", "DriverObject",
-    "DriverImageLoad", "DriverRegistry", "DriverMinifilter",
-    "DriverNetwork", "HookDll", "Etw", "Amsi",
-    "Scanner", "RuleEngine", "SelfProtect",
-};
-
-static const char*
-SourceName(int src)
-{
-    if (src >= 0 && src < (int)(sizeof(g_SourceNames) / sizeof(g_SourceNames[0]))) {
-        return g_SourceNames[src];
-    }
-    return "Unknown";
 }
 
 /* ── Driver port receiver thread ──────────────────────────────────────────── */
@@ -381,8 +331,6 @@ PipeListenerThread()
 static void
 ProcessorThread()
 {
-    ULONGLONG eventsProcessed = 0;
-
     AgentLog("SentinelAgent: Processing thread started\n");
 
     while (!g_Shutdown.load()) {
@@ -392,40 +340,19 @@ ProcessorThread()
             continue;   /* Timeout or shutdown */
         }
 
-        eventsProcessed++;
-
-        /* Format and log the event */
-        if (event.Source == SentinelSourceHookDll) {
-            const auto& hook = event.Payload.Hook;
-            AgentLog("[%llu] source=%s func=%s pid=%lu targetPid=%lu "
-                     "addr=0x%p size=0x%Ix prot=0x%lX status=0x%08lX\n",
-                     eventsProcessed,
-                     SourceName(event.Source),
-                     HookFunctionName(hook.Function),
-                     event.ProcessCtx.ProcessId,
-                     hook.TargetProcessId,
-                     (void*)(uintptr_t)hook.BaseAddress,
-                     hook.RegionSize,
-                     hook.Protection,
-                     hook.ReturnStatus);
-        } else {
-            AgentLog("[%llu] source=%s pid=%lu\n",
-                     eventsProcessed,
-                     SourceName(event.Source),
-                     event.ProcessCtx.ProcessId);
-        }
+        g_EventProcessor.Process(event);
     }
 
     /* Drain remaining events */
     {
         SENTINEL_EVENT event = {};
         while (g_EventQueue.Pop(event, 0)) {
-            eventsProcessed++;
+            g_EventProcessor.Process(event);
         }
     }
 
     AgentLog("SentinelAgent: Processing thread stopped (%llu events)\n",
-             eventsProcessed);
+             g_EventProcessor.EventsProcessed());
 }
 
 /* ── Pipeline lifecycle ───────────────────────────────────────────────────── */
@@ -436,15 +363,10 @@ PipelineStart()
     g_Shutdown.store(false);
     g_ShutdownEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
-    /* Open event log file */
-    g_hEventLog = CreateFileA(
-        "C:\\SentinelPOC\\agent_events.log",
-        FILE_APPEND_DATA,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        nullptr,
-        OPEN_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr);
+    /* Initialize event processor (JSON log + process table) */
+    if (!g_EventProcessor.Init("C:\\SentinelPOC\\agent_events.jsonl")) {
+        AgentLog("SentinelAgent: WARNING: Failed to open JSON log file\n");
+    }
 
     AgentLog("SentinelAgent: Pipeline starting...\n");
 
@@ -514,10 +436,7 @@ PipelineStop()
         g_ShutdownEvent = nullptr;
     }
 
-    if (g_hEventLog != INVALID_HANDLE_VALUE) {
-        CloseHandle(g_hEventLog);
-        g_hEventLog = INVALID_HANDLE_VALUE;
-    }
+    g_EventProcessor.Shutdown();
 
     AgentLog("SentinelAgent: Pipeline stopped\n");
 }

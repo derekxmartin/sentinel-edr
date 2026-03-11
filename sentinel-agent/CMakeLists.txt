@@ -5,6 +5,9 @@ add_executable(sentinel-agent
     main.cpp
     service.cpp
     pipeline.cpp
+    event_processor.cpp
+    process_table.cpp
+    json_writer.cpp
 )
 
 target_include_directories(sentinel-agent PRIVATE ${CMAKE_SOURCE_DIR}/common)

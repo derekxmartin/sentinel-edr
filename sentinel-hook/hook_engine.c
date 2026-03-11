@@ -19,6 +19,20 @@
 #include <windows.h>
 #include "hook_engine.h"
 
+/* ── Diagnostic logging helper ────────────────────────────────────────── */
+
+#define DIAG_LOG(fmt, ...) do {                                             \
+    char _dbuf[300];                                                        \
+    wsprintfA(_dbuf, fmt, __VA_ARGS__);                                     \
+    HANDLE _hd = CreateFileA("C:\\SentinelPOC\\hook_diag.log",              \
+        FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,              \
+        NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);                   \
+    if (_hd != INVALID_HANDLE_VALUE) {                                      \
+        DWORD _w; WriteFile(_hd, _dbuf, (DWORD)lstrlenA(_dbuf), &_w, NULL);\
+        CloseHandle(_hd);                                                   \
+    }                                                                       \
+} while(0)
+
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
 #define MAX_HOOKS           16
@@ -542,6 +556,16 @@ InstallHook(
         return FALSE;
     }
 
+    /* Diagnostic: dump first 16 raw bytes BEFORE disassembly */
+    {
+        const BYTE *fb = (const BYTE *)target;
+        DIAG_LOG("HookEngine: PRE  %-28s bytes=[%02X %02X %02X %02X %02X %02X %02X %02X "
+            "%02X %02X %02X %02X %02X %02X %02X %02X]\r\n",
+            FunctionName,
+            fb[0],fb[1],fb[2],fb[3],fb[4],fb[5],fb[6],fb[7],
+            fb[8],fb[9],fb[10],fb[11],fb[12],fb[13],fb[14],fb[15]);
+    }
+
     /* Find instruction boundary >= JMP_ABS_SIZE bytes */
     stolenSize = 0;
     ip = (const BYTE *)target;
@@ -549,6 +573,8 @@ InstallHook(
     while (stolenSize < JMP_ABS_SIZE) {
         DWORD len = SentinelGetInstructionLength(ip + stolenSize);
         if (len == 0) {
+            DIAG_LOG("HookEngine: FAIL %-28s at offset=%lu opcode=0x%02X\r\n",
+                FunctionName, stolenSize, ip[stolenSize]);
             return FALSE;
         }
         stolenSize += len;
@@ -561,6 +587,7 @@ InstallHook(
     /* Find a free slot */
     entry = FindFreeSlot();
     if (!entry) {
+        DIAG_LOG("HookEngine: SLOT %-28s no free slot\r\n", FunctionName);
         return FALSE;
     }
 
@@ -571,6 +598,8 @@ InstallHook(
         PAGE_EXECUTE_READWRITE);
 
     if (!trampoline) {
+        DIAG_LOG("HookEngine: VALLOC %-28s failed err=%lu\r\n",
+                 FunctionName, GetLastError());
         return FALSE;
     }
 
@@ -594,6 +623,8 @@ InstallHook(
     /* Patch target: write absolute JMP to detour, pad remaining with NOP */
     if (!VirtualProtect((void *)target, stolenSize,
                         PAGE_EXECUTE_READWRITE, &oldProtect)) {
+        DIAG_LOG("HookEngine: VPROT %-28s failed err=%lu\r\n",
+                 FunctionName, GetLastError());
         VirtualFree(trampoline, 0, MEM_RELEASE);
         return FALSE;
     }
@@ -613,7 +644,9 @@ InstallHook(
     entry->Active = TRUE;
     *OriginalFunc = trampoline;
 
-    /* No OutputDebugStringA here — runs under loader lock during DllMain */
+    DIAG_LOG("HookEngine: OK   %-28s stolen=%lu\r\n",
+             FunctionName, stolenSize);
+
     return TRUE;
 }
 

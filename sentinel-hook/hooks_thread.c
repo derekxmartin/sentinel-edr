@@ -5,6 +5,8 @@
  * Hooks:
  *   NtCreateThreadEx   — remote thread creation (classic injection vector)
  *   NtQueueApcThread   — APC injection (early-bird, atom bombing, etc.)
+ *   NtSuspendThread    — thread suspension (process hollowing prerequisite)
+ *   NtResumeThread     — thread resumption (completes process hollowing)
  */
 
 #include <windows.h>
@@ -36,10 +38,22 @@ typedef NTSTATUS (NTAPI *NtQueueApcThread_t)(
     PVOID           ApcArgument3
 );
 
+typedef NTSTATUS (NTAPI *NtSuspendThread_t)(
+    HANDLE          ThreadHandle,
+    PULONG          PreviousSuspendCount
+);
+
+typedef NTSTATUS (NTAPI *NtResumeThread_t)(
+    HANDLE          ThreadHandle,
+    PULONG          PreviousSuspendCount
+);
+
 /* ── Trampoline pointers ──────────────────────────────────────────────────── */
 
 static NtCreateThreadEx_t   Original_NtCreateThreadEx   = NULL;
 static NtQueueApcThread_t   Original_NtQueueApcThread   = NULL;
+static NtSuspendThread_t    Original_NtSuspendThread    = NULL;
+static NtResumeThread_t     Original_NtResumeThread     = NULL;
 
 /* ── Detour: NtCreateThreadEx ─────────────────────────────────────────────── */
 
@@ -74,6 +88,7 @@ Hooked_NtCreateThreadEx(
         evt.BaseAddress     = (ULONG_PTR)StartRoutine;
         evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
         evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
 
         SentinelGetCallingModule(evt.ReturnAddress,
                                  evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
@@ -108,6 +123,67 @@ Hooked_NtQueueApcThread(
         evt.BaseAddress     = (ULONG_PTR)ApcRoutine;
         evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
         evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
+
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
+
+    return status;
+}
+
+/* ── Detour: NtSuspendThread ──────────────────────────────────────────────── */
+
+static NTSTATUS NTAPI
+Hooked_NtSuspendThread(
+    HANDLE          ThreadHandle,
+    PULONG          PreviousSuspendCount)
+{
+    NTSTATUS status;
+    __try {
+        status = Original_NtSuspendThread(ThreadHandle, PreviousSuspendCount);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtSuspendThread;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
+
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
+
+    return status;
+}
+
+/* ── Detour: NtResumeThread ───────────────────────────────────────────────── */
+
+static NTSTATUS NTAPI
+Hooked_NtResumeThread(
+    HANDLE          ThreadHandle,
+    PULONG          PreviousSuspendCount)
+{
+    NTSTATUS status;
+    __try {
+        status = Original_NtResumeThread(ThreadHandle, PreviousSuspendCount);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtResumeThread;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
 
         SentinelGetCallingModule(evt.ReturnAddress,
                                  evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
@@ -130,4 +206,12 @@ InstallThreadHooks(void)
     InstallHook("ntdll.dll", "NtQueueApcThread",
                 (void *)Hooked_NtQueueApcThread,
                 (void **)&Original_NtQueueApcThread);
+
+    InstallHook("ntdll.dll", "NtSuspendThread",
+                (void *)Hooked_NtSuspendThread,
+                (void **)&Original_NtSuspendThread);
+
+    InstallHook("ntdll.dll", "NtResumeThread",
+                (void *)Hooked_NtResumeThread,
+                (void **)&Original_NtResumeThread);
 }

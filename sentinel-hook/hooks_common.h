@@ -84,5 +84,13 @@ void SentinelLeaveHook(void);
 void InstallMemoryHooks(void);
 void InstallThreadHooks(void);
 void InstallSectionHooks(void);
+void InstallProcessHooks(void);
+
+/*
+ * SentinelCaptureStackHash
+ *   Compute a hash of the current call stack for behavioral correlation.
+ *   Uses RtlCaptureStackBackTrace (ntdll) — safe from hook context.
+ */
+ULONG SentinelCaptureStackHash(void);
 
 #endif /* SENTINEL_HOOKS_COMMON_H */

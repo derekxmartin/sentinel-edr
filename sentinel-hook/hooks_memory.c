@@ -6,6 +6,7 @@
  *   NtAllocateVirtualMemory  — memory allocation (RWX detection)
  *   NtProtectVirtualMemory   — permission changes (RW→RX shellcode pattern)
  *   NtWriteVirtualMemory     — cross-process memory writes
+ *   NtReadVirtualMemory      — cross-process memory reads (credential dumping)
  */
 
 #include <windows.h>
@@ -40,11 +41,20 @@ typedef NTSTATUS (NTAPI *NtWriteVirtualMemory_t)(
     PSIZE_T     NumberOfBytesWritten
 );
 
+typedef NTSTATUS (NTAPI *NtReadVirtualMemory_t)(
+    HANDLE      ProcessHandle,
+    PVOID       BaseAddress,
+    PVOID       Buffer,
+    SIZE_T      NumberOfBytesToRead,
+    PSIZE_T     NumberOfBytesRead
+);
+
 /* ── Trampoline pointers (set by InstallHook) ─────────────────────────────── */
 
 static NtAllocateVirtualMemory_t    Original_NtAllocateVirtualMemory    = NULL;
 static NtProtectVirtualMemory_t     Original_NtProtectVirtualMemory     = NULL;
 static NtWriteVirtualMemory_t       Original_NtWriteVirtualMemory       = NULL;
+static NtReadVirtualMemory_t        Original_NtReadVirtualMemory        = NULL;
 
 /* ── Detour: NtAllocateVirtualMemory ──────────────────────────────────────── */
 
@@ -76,6 +86,7 @@ Hooked_NtAllocateVirtualMemory(
         evt.Protection      = Protect;
         evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
         evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
 
         SentinelGetCallingModule(evt.ReturnAddress,
                                  evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
@@ -113,6 +124,7 @@ Hooked_NtProtectVirtualMemory(
         evt.Protection      = NewProtect;
         evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
         evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
 
         SentinelGetCallingModule(evt.ReturnAddress,
                                  evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
@@ -150,6 +162,45 @@ Hooked_NtWriteVirtualMemory(
         evt.RegionSize      = NumberOfBytesToWrite;
         evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
         evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
+
+        SentinelGetCallingModule(evt.ReturnAddress,
+                                 evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
+        SentinelEmitHookEvent(&evt);
+        SentinelLeaveHook();
+    }
+
+    return status;
+}
+
+/* ── Detour: NtReadVirtualMemory ──────────────────────────────────────────── */
+
+static NTSTATUS NTAPI
+Hooked_NtReadVirtualMemory(
+    HANDLE      ProcessHandle,
+    PVOID       BaseAddress,
+    PVOID       Buffer,
+    SIZE_T      NumberOfBytesToRead,
+    PSIZE_T     NumberOfBytesRead)
+{
+    NTSTATUS status;
+    __try {
+        status = Original_NtReadVirtualMemory(
+            ProcessHandle, BaseAddress, Buffer,
+            NumberOfBytesToRead, NumberOfBytesRead);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    if (SentinelEnterHook()) {
+        SENTINEL_HOOK_EVENT evt = {0};
+        evt.Function        = SentinelHookNtReadVirtualMemory;
+        evt.TargetProcessId = SentinelGetTargetPid(ProcessHandle);
+        evt.BaseAddress     = (ULONG_PTR)BaseAddress;
+        evt.RegionSize      = NumberOfBytesToRead;
+        evt.ReturnAddress   = (ULONG_PTR)_ReturnAddress();
+        evt.ReturnStatus    = status;
+        evt.StackHash       = SentinelCaptureStackHash();
 
         SentinelGetCallingModule(evt.ReturnAddress,
                                  evt.CallingModule, SENTINEL_MAX_MODULE_NAME);
@@ -176,4 +227,8 @@ InstallMemoryHooks(void)
     InstallHook("ntdll.dll", "NtWriteVirtualMemory",
                 (void *)Hooked_NtWriteVirtualMemory,
                 (void **)&Original_NtWriteVirtualMemory);
+
+    InstallHook("ntdll.dll", "NtReadVirtualMemory",
+                (void *)Hooked_NtReadVirtualMemory,
+                (void **)&Original_NtReadVirtualMemory);
 }

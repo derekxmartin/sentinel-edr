@@ -141,6 +141,24 @@ SentinelGetCallingModule(
     }
 }
 
+/* ── SentinelCaptureStackHash ─────────────────────────────────────────────── */
+
+/*
+ * Hash the current call stack using RtlCaptureStackBackTrace (ntdll).
+ * Skip 2 frames: SentinelCaptureStackHash → Hooked_NtXxx detour.
+ * Capture up to 16 frames for a meaningful behavioral fingerprint.
+ * The BackTraceHash output parameter provides the hash directly.
+ */
+ULONG
+SentinelCaptureStackHash(void)
+{
+    void *frames[16];
+    ULONG hash = 0;
+
+    RtlCaptureStackBackTrace(2, 16, frames, &hash);
+    return hash;
+}
+
 /* ── Diagnostic file log ──────────────────────────────────────────────────── */
 
 /*
@@ -179,13 +197,14 @@ SentinelEmitHookEvent(SENTINEL_HOOK_EVENT *evt)
 
     wsprintfA(msg,
         "SentinelHook: %s targetPid=%lu addr=0x%p size=0x%Ix "
-        "prot=0x%lX alloc=0x%lX status=0x%08lX\n",
+        "prot=0x%lX alloc=0x%lX stackHash=0x%08lX status=0x%08lX\n",
         SentinelHookFunctionName(evt->Function),
         evt->TargetProcessId,
         (void *)evt->BaseAddress,
         evt->RegionSize,
         evt->Protection,
         evt->AllocationType,
+        evt->StackHash,
         evt->ReturnStatus);
 
     OutputDebugStringA(msg);

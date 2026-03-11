@@ -7,6 +7,7 @@
  *
  * P4-T3: Single-Event Rule Engine.
  * P4-T4: Sequence Rule Engine.
+ * P4-T5: Threshold Rule Engine.
  */
 
 #ifndef SENTINEL_RULE_PARSER_H
@@ -34,6 +35,14 @@ public:
     static bool ParseSequenceDirectory(const std::string& dirPath,
                                        std::vector<SequenceRule>& rules);
 
+    /* Parse threshold rules from a single .yaml file. */
+    static bool ParseThresholdFile(const std::string& path,
+                                   std::vector<ThresholdRule>& rules);
+
+    /* Parse all threshold rules from .yaml files in a directory. */
+    static bool ParseThresholdDirectory(const std::string& dirPath,
+                                        std::vector<ThresholdRule>& rules);
+
 private:
     static bool ParseRule(const std::vector<std::string>& lines,
                           DetectionRule& rule);
@@ -41,8 +50,14 @@ private:
     static bool ParseSequenceRule(const std::vector<std::string>& lines,
                                   SequenceRule& rule);
 
+    static bool ParseThresholdRule(const std::vector<std::string>& lines,
+                                    ThresholdRule& rule);
+
     /* Check if a block has type: sequence. */
     static bool IsSequenceBlock(const std::vector<std::string>& lines);
+
+    /* Check if a block has type: threshold. */
+    static bool IsThresholdBlock(const std::vector<std::string>& lines);
 
     static ConditionOp         ParseOp(const std::string& op);
     static SENTINEL_SEVERITY   ParseSeverity(const std::string& sev);

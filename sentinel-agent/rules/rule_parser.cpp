@@ -4,6 +4,7 @@
  *
  * P4-T3: Single-Event Rule Engine.
  * P4-T4: Sequence Rule Engine.
+ * P4-T5: Threshold Rule Engine.
  */
 
 #include "rule_parser.h"
@@ -301,7 +302,8 @@ RuleParser::ParseFile(const std::string& path,
     if (!ReadBlocks(path, blocks)) return false;
 
     for (const auto& block : blocks) {
-        if (IsSequenceBlock(block)) continue; /* Skip sequence rules */
+        if (IsSequenceBlock(block)) continue;  /* Skip sequence rules */
+        if (IsThresholdBlock(block)) continue;  /* Skip threshold rules */
         DetectionRule rule;
         if (ParseRule(block, rule)) {
             rules.push_back(std::move(rule));
@@ -610,6 +612,195 @@ RuleParser::ParseSequenceDirectory(const std::string& dirPath,
         [](const std::string& path, void* ctx) -> bool {
             auto* r = static_cast<std::vector<SequenceRule>*>(ctx);
             RuleParser::ParseSequenceFile(path, *r);
+            return true;
+        }, &rules);
+}
+
+/* ── Check if a block is a threshold rule ────────────────────────────────── */
+
+bool
+RuleParser::IsThresholdBlock(const std::vector<std::string>& lines)
+{
+    for (const auto& rawLine : lines) {
+        std::string line = rawLine;
+        size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+        }
+        std::string trimmed = Trim(line);
+        if (trimmed.empty()) continue;
+
+        size_t colonPos = trimmed.find(':');
+        if (colonPos == std::string::npos) continue;
+
+        std::string key = Trim(trimmed.substr(0, colonPos));
+        std::string val = Trim(trimmed.substr(colonPos + 1));
+        val = Unquote(val);
+
+        if (key == "type" && ToLower(val) == "threshold") {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* ── Parse a threshold rule block ────────────────────────────────────────── */
+
+bool
+RuleParser::ParseThresholdRule(const std::vector<std::string>& lines,
+                                ThresholdRule& rule)
+{
+    rule.severity = SentinelSeverityMedium;
+    rule.action = RuleAction::Log;
+    rule.enabled = true;
+    rule.threshold = 5;       /* Default */
+    rule.windowMs = 30000;    /* Default 30s */
+    rule.perProcess = true;   /* Default per-PID */
+
+    bool inConditions = false;
+    RuleCondition currentCond = {};
+    bool hasCond = false;
+
+    for (const auto& rawLine : lines) {
+        std::string line = rawLine;
+
+        /* Strip comments */
+        size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+        }
+
+        std::string trimmed = Trim(line);
+        if (trimmed.empty()) continue;
+
+        /* Check if this is a condition list item (starts with -) */
+        bool isListItem = false;
+        size_t leadingSpaces = line.find_first_not_of(" \t");
+        if (leadingSpaces != std::string::npos && leadingSpaces >= 2 &&
+            line[leadingSpaces] == '-') {
+            isListItem = true;
+        }
+
+        if (isListItem && inConditions) {
+            /* Save previous condition if complete */
+            if (hasCond && !currentCond.field.empty()) {
+                rule.conditions.push_back(currentCond);
+            }
+            currentCond = {};
+            hasCond = true;
+
+            /* Parse "- field: value" */
+            std::string content = Trim(trimmed.substr(1)); /* Skip '-' */
+            size_t colonPos = content.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = Trim(content.substr(0, colonPos));
+                std::string val = Trim(content.substr(colonPos + 1));
+                val = Unquote(val);
+
+                if (key == "field") currentCond.field = val;
+                else if (key == "op") currentCond.op = ParseOp(val);
+                else if (key == "value") currentCond.value = val;
+            }
+        } else if (leadingSpaces != std::string::npos && leadingSpaces >= 4 &&
+                   inConditions && !isListItem) {
+            /* Continuation of a condition item (indented key: value) */
+            size_t colonPos = trimmed.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = Trim(trimmed.substr(0, colonPos));
+                std::string val = Trim(trimmed.substr(colonPos + 1));
+                val = Unquote(val);
+
+                if (key == "field") currentCond.field = val;
+                else if (key == "op") currentCond.op = ParseOp(val);
+                else if (key == "value") currentCond.value = val;
+            }
+        } else {
+            /* Top-level key: value */
+            if (inConditions && hasCond && !currentCond.field.empty()) {
+                rule.conditions.push_back(currentCond);
+                currentCond = {};
+                hasCond = false;
+            }
+            inConditions = false;
+
+            size_t colonPos = trimmed.find(':');
+            if (colonPos == std::string::npos) continue;
+
+            std::string key = Trim(trimmed.substr(0, colonPos));
+            std::string val = Trim(trimmed.substr(colonPos + 1));
+            val = Unquote(val);
+
+            if (key == "name") {
+                rule.name = val;
+            } else if (key == "type") {
+                /* Already validated by IsThresholdBlock */
+            } else if (key == "source") {
+                std::stringstream ss(val);
+                std::string token;
+                while (std::getline(ss, token, ',')) {
+                    token = Trim(token);
+                    auto src = ParseSource(token);
+                    if (src != SentinelSourceMax) {
+                        rule.sources.push_back(src);
+                    }
+                }
+            } else if (key == "severity") {
+                rule.severity = ParseSeverity(val);
+            } else if (key == "action") {
+                rule.action = ParseAction(val);
+            } else if (key == "enabled") {
+                rule.enabled = (ToLower(val) != "false" && val != "0");
+            } else if (key == "threshold") {
+                try { rule.threshold = std::stoul(val); } catch (...) {}
+            } else if (key == "window") {
+                try { rule.windowMs = std::stoul(val); } catch (...) {}
+            } else if (key == "group_by") {
+                std::string lower = ToLower(val);
+                rule.perProcess = (lower == "process" || lower == "pid");
+            } else if (key == "conditions") {
+                inConditions = true;
+            }
+        }
+    }
+
+    /* Save last condition */
+    if (hasCond && !currentCond.field.empty()) {
+        rule.conditions.push_back(currentCond);
+    }
+
+    /* Validate: must have a name, at least one condition, and threshold > 0 */
+    return !rule.name.empty() && !rule.conditions.empty() && rule.threshold > 0;
+}
+
+/* ── Parse threshold rules from a single file ────────────────────────────── */
+
+bool
+RuleParser::ParseThresholdFile(const std::string& path,
+                                std::vector<ThresholdRule>& rules)
+{
+    std::vector<std::vector<std::string>> blocks;
+    if (!ReadBlocks(path, blocks)) return false;
+
+    for (const auto& block : blocks) {
+        if (!IsThresholdBlock(block)) continue;
+        ThresholdRule rule;
+        if (ParseThresholdRule(block, rule)) {
+            rules.push_back(std::move(rule));
+        }
+    }
+    return true;
+}
+
+/* ── Parse all threshold rules in a directory ─────────────────────────────── */
+
+bool
+RuleParser::ParseThresholdDirectory(const std::string& dirPath,
+                                     std::vector<ThresholdRule>& rules)
+{
+    return ScanDirectory(dirPath,
+        [](const std::string& path, void* ctx) -> bool {
+            auto* r = static_cast<std::vector<ThresholdRule>*>(ctx);
+            RuleParser::ParseThresholdFile(path, *r);
             return true;
         }, &rules);
 }

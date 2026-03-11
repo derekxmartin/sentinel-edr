@@ -52,6 +52,20 @@ struct DetectionRule {
     bool                                enabled;
 };
 
+/* ── Threshold rule (P4-T5) ─────────────────────────────────────────────── */
+
+struct ThresholdRule {
+    std::string                         name;
+    std::vector<SENTINEL_EVENT_SOURCE>  sources;      /* Empty = match all */
+    std::vector<RuleCondition>          conditions;   /* AND filter */
+    unsigned int                        threshold;    /* Count to exceed */
+    DWORD                               windowMs;     /* Sliding window ms */
+    bool                                perProcess;   /* true=per-PID, false=global */
+    SENTINEL_SEVERITY                   severity;
+    RuleAction                          action;
+    bool                                enabled;
+};
+
 /* ── Sequence rule types (P4-T4) ────────────────────────────────────────── */
 
 /* A single step in a sequence rule — all conditions must match (AND). */

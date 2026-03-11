@@ -11,6 +11,7 @@ add_executable(sentinel-agent
     rules/rule_engine.cpp
     rules/rule_parser.cpp
     rules/sequence_engine.cpp
+    rules/threshold_engine.cpp
 )
 
 target_include_directories(sentinel-agent PRIVATE

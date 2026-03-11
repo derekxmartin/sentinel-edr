@@ -1,0 +1,23 @@
+# Rapid Memory Allocation — Threshold Rule (Test)
+# Detects a burst of NtAllocateVirtualMemory calls from a single process.
+# Useful for detecting memory spray / shellcode staging patterns.
+#
+# P4-T5: Threshold Rule Engine.
+
+type: threshold
+name: Rapid Memory Allocation
+source: HookDll
+severity: medium
+action: LOG
+
+# Fire when >= 5 matching events occur within 10 seconds
+threshold: 5
+window: 10000
+
+# Count per source PID (each process tracked independently)
+group_by: process
+
+conditions:
+  - field: payload.function
+    op: equals
+    value: NtAllocateVirtualMemory

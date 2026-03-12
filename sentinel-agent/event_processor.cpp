@@ -128,6 +128,26 @@ EventProcessor::PrintSummary(const SENTINEL_EVENT& evt)
                     pipe.CreatingProcessId,
                     pipe.PipeName,
                     pipe.IsSuspicious ? " [SUSPICIOUS]" : "");
+    } else if (evt.Source == SentinelSourceDriverNetwork) {
+        const auto& net = evt.Payload.Network;
+        /* IP byte order matches NetworkPayloadToJson (LSB = first octet) */
+        std::printf("[%llu] source=%s %s pid=%lu proto=%lu "
+                    "%lu.%lu.%lu.%lu:%u -> %lu.%lu.%lu.%lu:%u\n",
+                    m_eventsProcessed,
+                    SourceName(evt.Source),
+                    net.Direction == SentinelNetOutbound ? "OUTBOUND" : "INBOUND",
+                    net.ProcessId,
+                    net.Protocol,
+                    net.LocalAddr & 0xFF,
+                    (net.LocalAddr >> 8) & 0xFF,
+                    (net.LocalAddr >> 16) & 0xFF,
+                    (net.LocalAddr >> 24) & 0xFF,
+                    (unsigned)net.LocalPort,
+                    net.RemoteAddr & 0xFF,
+                    (net.RemoteAddr >> 8) & 0xFF,
+                    (net.RemoteAddr >> 16) & 0xFF,
+                    (net.RemoteAddr >> 24) & 0xFF,
+                    (unsigned)net.RemotePort);
     } else if (evt.Source == SentinelSourceDriverProcess) {
         const auto& proc = evt.Payload.Process;
         std::printf("[%llu] source=%s %s pid=%lu ppid=%lu\n",

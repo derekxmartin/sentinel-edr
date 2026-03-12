@@ -420,6 +420,8 @@ JsonWriter::PayloadToJson(const SENTINEL_EVENT& evt)
         return FilePayloadToJson(evt.Payload.File);
     case SentinelSourceDriverPipe:
         return PipePayloadToJson(evt.Payload.Pipe);
+    case SentinelSourceDriverNetwork:
+        return NetworkPayloadToJson(evt.Payload.Network);
     case SentinelSourceAmsi:
         return AmsiPayloadToJson(evt.Payload.Amsi);
     case SentinelSourceRuleEngine:

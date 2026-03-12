@@ -157,6 +157,15 @@ SentinelCommsSend(
     }
 
     /*
+     * FltSendMessage requires IRQL <= APC_LEVEL.  WFP classify callbacks
+     * can fire at DISPATCH_LEVEL during reauthorization — guard here as
+     * belt-and-suspenders so no caller can trigger an IRQL BSOD.
+     */
+    if (KeGetCurrentIrql() > APC_LEVEL) {
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    /*
      * SENTINEL_FILTER_MSG contains SENTINEL_EVENT (~22 KB) — too large
      * for the kernel stack.  Pool-allocate to avoid stack overflow.
      */

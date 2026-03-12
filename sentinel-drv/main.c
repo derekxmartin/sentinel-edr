@@ -29,6 +29,7 @@
 #include "minifilter.h"
 #include "minifilter_pipes.h"
 #include "file_hash.h"
+#include "wfp_callout.h"
 
 /* ── Forward declarations ────────────────────────────────────────────────── */
 
@@ -107,6 +108,7 @@ SentinelFilterUnload(
     PAGED_CODE();
 
     /* Unregister callbacks before tearing down comms (reverse init order) */
+    SentinelWfpStop();
     SentinelFileHashStop();
     SentinelKapcInjectStop();
     SentinelRegistryCallbackStop();
@@ -290,13 +292,22 @@ DriverEntry(
         goto cleanup_kapc;
     }
 
-    /* ── Step 12: Start filtering ──────────────────────────────────────── */
+    /* ── Step 12: Initialize WFP callouts ─────────────────────────────── */
+
+    status = SentinelWfpInit(g_DeviceObject);
+    if (!NT_SUCCESS(status)) {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "SentinelPOC: SentinelWfpInit failed 0x%08X\n", status));
+        goto cleanup_hash;
+    }
+
+    /* ── Step 13: Start filtering ──────────────────────────────────────── */
 
     status = FltStartFiltering(g_FilterHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
             "SentinelPOC: FltStartFiltering failed 0x%08X\n", status));
-        goto cleanup_hash;
+        goto cleanup_wfp;
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
@@ -305,6 +316,9 @@ DriverEntry(
     return STATUS_SUCCESS;
 
     /* ── Cleanup on failure ────────────────────────────────────────────── */
+
+cleanup_wfp:
+    SentinelWfpStop();
 
 cleanup_hash:
     SentinelFileHashStop();

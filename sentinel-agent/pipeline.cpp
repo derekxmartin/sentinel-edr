@@ -166,10 +166,6 @@ DriverPortReceiverThread()
                 break;  /* Reconnect */
             }
 
-            /* Debug: log raw source for every driver event */
-            AgentLog("SentinelAgent: [DBG] recv source=%d\n",
-                     (int)msg.Body.Event.Source);
-
             /* Push the event into the queue */
             g_EventQueue.Push(msg.Body.Event);
         }

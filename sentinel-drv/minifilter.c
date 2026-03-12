@@ -246,9 +246,23 @@ SentinelPreCreate(
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
 
-    /* Skip fast I/O only — safe minimum filter */
-    if (FLT_IS_FASTIO_OPERATION(Data)) {
+    if (SentinelMinifilterShouldSkipPreOp(Data)) {
         return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    /* Skip directory opens — they generate massive noise */
+    if (FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DIRECTORY_FILE)) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    /* Skip if path is excluded (wrapped in __try — FltGetFileNameInformation
+     * can fault in edge cases; if it does, let the event through) */
+    __try {
+        if (SentinelMinifilterIsExcluded(Data)) {
+            return FLT_PREOP_SUCCESS_NO_CALLBACK;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        /* Fall through — emit event rather than silently swallowing it */
     }
 
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -275,6 +289,11 @@ SentinelPostCreate(
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
+    /*
+     * Only emit for creates that actually opened/created a file.
+     * FILE_OPENED = existing file opened, FILE_CREATED = new file created,
+     * FILE_OVERWRITTEN = existing file overwritten.
+     */
     {
         ULONG_PTR info = Data->IoStatus.Information;
         if (info != FILE_CREATED &&
@@ -306,8 +325,12 @@ SentinelPreWrite(
         return FLT_PREOP_SUCCESS_NO_CALLBACK;
     }
 
-    if (SentinelMinifilterIsExcluded(Data)) {
-        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    __try {
+        if (SentinelMinifilterIsExcluded(Data)) {
+            return FLT_PREOP_SUCCESS_NO_CALLBACK;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        /* Fall through */
     }
 
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -351,7 +374,19 @@ SentinelPreSetInfo(
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
 
-    if (SentinelMinifilterShouldSkipPreOp(Data)) {
+    /*
+     * Don't use SentinelMinifilterShouldSkipPreOp here — it filters
+     * KernelMode requestors, but NTFS can issue FileDispositionInformation
+     * at KernelMode even for user-mode deletes.  We still skip fast I/O
+     * and paging I/O for safety.
+     */
+    if (FLT_IS_FASTIO_OPERATION(Data)) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+    if (FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+    if (KeGetCurrentIrql() > APC_LEVEL) {
         return FLT_PREOP_SUCCESS_NO_CALLBACK;
     }
 
@@ -368,8 +403,12 @@ SentinelPreSetInfo(
         return FLT_PREOP_SUCCESS_NO_CALLBACK;
     }
 
-    if (SentinelMinifilterIsExcluded(Data)) {
-        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    __try {
+        if (SentinelMinifilterIsExcluded(Data)) {
+            return FLT_PREOP_SUCCESS_NO_CALLBACK;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        /* Fall through */
     }
 
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -420,6 +459,10 @@ SentinelPostSetInfo(
 /*
  * Pool-allocate a SENTINEL_EVENT, fill it with file operation details,
  * and send it to the agent via the filter communication port.
+ *
+ * Each risky operation is isolated in its own __try/__except block so
+ * a crash in one (e.g., name query or token extraction) degrades
+ * gracefully — the event is still sent with whatever fields succeeded.
  */
 static void
 SentinelMinifilterEmitFileEvent(
@@ -450,19 +493,25 @@ SentinelMinifilterEmitFileEvent(
         return;
     }
 
-    /* Initialize event envelope */
-    SENTINEL_EVENT_INIT(*event, SentinelSourceDriverMinifilter,
-                        SentinelSeverityInformational);
-
-    /* Fill file payload — always safe */
+    /* Initialize event envelope — safe fields first */
+    RtlZeroMemory(event, sizeof(SENTINEL_EVENT));
+    event->Source = SentinelSourceDriverMinifilter;
+    event->Severity = SentinelSeverityInformational;
     event->Payload.File.Operation = Operation;
     event->Payload.File.RequestingProcessId =
         FltGetRequestorProcessId(Data);
 
-    /*
-     * Process context — isolated __try so a crash here doesn't
-     * prevent the event from being sent (fields stay zeroed).
-     */
+    /* UUID + timestamp */
+    __try {
+        ExUuidCreate(&event->EventId);
+        KeQuerySystemTimePrecise(&event->Timestamp);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+            "SentinelPOC: Exception 0x%08X in UUID/timestamp\n",
+            GetExceptionCode()));
+    }
+
+    /* Process context */
     __try {
         SentinelMinifilterFillProcessCtx(&event->ProcessCtx, Data);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -471,10 +520,7 @@ SentinelMinifilterEmitFileEvent(
             GetExceptionCode()));
     }
 
-    /*
-     * File path — isolated __try so a name-query crash doesn't
-     * prevent the event from being sent (path stays empty).
-     */
+    /* File path query */
     __try {
         status = FltGetFileNameInformation(
             Data,
@@ -509,9 +555,9 @@ SentinelMinifilterEmitFileEvent(
             GetExceptionCode()));
     }
 
-    /* For rename operations, extract the new file path */
-    __try {
-        if (Operation == SentinelFileOpRename) {
+    /* Rename: extract new file path */
+    if (Operation == SentinelFileOpRename) {
+        __try {
             PFILE_RENAME_INFORMATION renameInfo =
                 (PFILE_RENAME_INFORMATION)Data->Iopb->Parameters
                     .SetFileInformation.InfoBuffer;
@@ -528,10 +574,23 @@ SentinelMinifilterEmitFileEvent(
                     copyLen
                 );
             }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+                "SentinelPOC: Exception 0x%08X in rename handling\n",
+                GetExceptionCode()));
         }
+    }
 
-        /* For delete via disposition, check if delete flag is actually set */
-        if (Operation == SentinelFileOpDelete) {
+    /*
+     * Delete: verify the delete flag is actually set.
+     * Modern Windows (10 RS5+) may use FILE_DISPOSITION_ON_CLOSE (0x2)
+     * instead of FILE_DISPOSITION_DELETE (0x1), so check both.
+     */
+#ifndef FILE_DISPOSITION_ON_CLOSE
+#define FILE_DISPOSITION_ON_CLOSE 0x00000002
+#endif
+    if (Operation == SentinelFileOpDelete) {
+        __try {
             FILE_INFORMATION_CLASS infoClass =
                 Data->Iopb->Parameters.SetFileInformation.FileInformationClass;
 
@@ -547,15 +606,17 @@ SentinelMinifilterEmitFileEvent(
                     (PFILE_DISPOSITION_INFORMATION_EX)Data->Iopb->Parameters
                         .SetFileInformation.InfoBuffer;
                 if (dispInfoEx &&
-                    !FlagOn(dispInfoEx->Flags, FILE_DISPOSITION_DELETE)) {
+                    !FlagOn(dispInfoEx->Flags,
+                            FILE_DISPOSITION_DELETE |
+                            FILE_DISPOSITION_ON_CLOSE)) {
                     goto cleanup;
                 }
             }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+                "SentinelPOC: Exception 0x%08X in delete handling\n",
+                GetExceptionCode()));
         }
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in rename/delete handling\n",
-            GetExceptionCode()));
     }
 
     /* Send event to agent */

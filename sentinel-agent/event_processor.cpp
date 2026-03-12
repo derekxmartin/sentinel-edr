@@ -94,6 +94,19 @@ EventProcessor::PrintSummary(const SENTINEL_EVENT& evt)
                     (unsigned long long)hook.RegionSize,
                     hook.Protection,
                     hook.ReturnStatus);
+    } else if (evt.Source == SentinelSourceDriverMinifilter) {
+        const auto& file = evt.Payload.File;
+        static const char* fileOpNames[] = {
+            "CREATE", "WRITE", "RENAME", "DELETE", "SETINFO"
+        };
+        const char* opName = (file.Operation >= 0 && file.Operation <= 4)
+            ? fileOpNames[file.Operation] : "UNKNOWN";
+        std::printf("[%llu] source=%s %s pid=%lu path=%S\n",
+                    m_eventsProcessed,
+                    SourceName(evt.Source),
+                    opName,
+                    file.RequestingProcessId,
+                    file.FilePath);
     } else if (evt.Source == SentinelSourceDriverProcess) {
         const auto& proc = evt.Payload.Process;
         std::printf("[%llu] source=%s %s pid=%lu ppid=%lu\n",

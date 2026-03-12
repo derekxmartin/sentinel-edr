@@ -13,6 +13,7 @@ wdk_add_driver(sentinel-drv
     callbacks_imageload.c
     callbacks_registry.c
     kapc_inject.c
+    minifilter.c
 )
 
 target_include_directories(sentinel-drv PRIVATE ${CMAKE_SOURCE_DIR}/common)

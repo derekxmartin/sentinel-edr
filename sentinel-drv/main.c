@@ -26,6 +26,7 @@
 #include "callbacks_imageload.h"
 #include "callbacks_registry.h"
 #include "kapc_inject.h"
+#include "minifilter.h"
 
 /* ── Forward declarations ────────────────────────────────────────────────── */
 
@@ -63,16 +64,18 @@ PFLT_FILTER     g_FilterHandle  = NULL;
 
 /* ── Minifilter registration structures ──────────────────────────────────── */
 
-/*
- * No I/O operation callbacks yet — those come in Phase 5 (minifilter).
- * We register the filter now solely to get FltCreateCommunicationPort.
- */
-
 const FLT_CONTEXT_REGISTRATION g_ContextRegistration[] = {
     { FLT_CONTEXT_END }
 };
 
+/*
+ * Minifilter I/O operation callbacks (Phase 5).
+ * Pre-ops filter excluded paths; post-ops emit telemetry events.
+ */
 const FLT_OPERATION_REGISTRATION g_OperationCallbacks[] = {
+    { IRP_MJ_CREATE,          0, SentinelPreCreate,  SentinelPostCreate },
+    { IRP_MJ_WRITE,           0, SentinelPreWrite,   SentinelPostWrite },
+    { IRP_MJ_SET_INFORMATION, 0, SentinelPreSetInfo, SentinelPostSetInfo },
     { IRP_MJ_OPERATION_END }
 };
 

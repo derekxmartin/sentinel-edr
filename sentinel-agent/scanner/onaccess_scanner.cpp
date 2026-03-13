@@ -145,7 +145,14 @@ OnAccessScanner::OnFileEvent(const SENTINEL_FILE_EVENT& fileEvt,
             scan.ScanType     = SentinelScanOnAccess;
             scan.IsMatch      = TRUE;
             scan.TargetProcessId = fileEvt.RequestingProcessId;
-            wcscpy_s(scan.TargetPath, SENTINEL_MAX_PATH, fileEvt.FilePath);
+
+            /* Convert NT device path to Win32 for display consistency. */
+            WCHAR win32Path[SENTINEL_MAX_PATH];
+            if (NtPathToWin32(fileEvt.FilePath, win32Path, SENTINEL_MAX_PATH)) {
+                wcscpy_s(scan.TargetPath, SENTINEL_MAX_PATH, win32Path);
+            } else {
+                wcscpy_s(scan.TargetPath, SENTINEL_MAX_PATH, fileEvt.FilePath);
+            }
             strncpy_s(scan.YaraRule, sizeof(scan.YaraRule),
                       cached.yaraRule, _TRUNCATE);
             strncpy_s(scan.Sha256Hex, sizeof(scan.Sha256Hex),

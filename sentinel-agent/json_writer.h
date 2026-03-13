@@ -69,6 +69,7 @@ private:
     std::string AlertPayloadToJson(const SENTINEL_ALERT_EVENT& alert);
     std::string TamperPayloadToJson(const SENTINEL_TAMPER_EVENT& tamper);
     std::string EtwPayloadToJson(const SENTINEL_ETW_EVENT& etw);
+    std::string ScannerPayloadToJson(const SENTINEL_SCANNER_EVENT& scan);
 
     /* String helpers */
     static std::string EscapeJson(const std::string& s);

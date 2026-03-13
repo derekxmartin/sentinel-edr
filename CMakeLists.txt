@@ -27,6 +27,11 @@ endif()
 # ── Common include path ──────────────────────────────────────────────────────
 include_directories(${CMAKE_SOURCE_DIR}/common)
 
+# ── Dependencies ─────────────────────────────────────────────────────────────
+
+# libyara — YARA pattern matching engine (built from source)
+add_subdirectory(deps/yara)
+
 # ── Sub-projects ─────────────────────────────────────────────────────────────
 
 # Kernel-mode driver (requires WDK)

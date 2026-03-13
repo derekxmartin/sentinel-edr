@@ -435,6 +435,8 @@ JsonWriter::PayloadToJson(const SENTINEL_EVENT& evt)
         return AlertPayloadToJson(evt.Payload.Alert);
     case SentinelSourceSelfProtect:
         return TamperPayloadToJson(evt.Payload.Tamper);
+    case SentinelSourceScanner:
+        return ScannerPayloadToJson(evt.Payload.Scanner);
     default:
         return "{}";
     }
@@ -1040,6 +1042,49 @@ JsonWriter::EtwPayloadToJson(const SENTINEL_ETW_EVENT& etw)
 
     default:
         break;
+    }
+
+    json += '}';
+    return json;
+}
+
+/* ── Scanner payload (P8-T1) ────────────────────────────────────────────── */
+
+std::string
+JsonWriter::ScannerPayloadToJson(const SENTINEL_SCANNER_EVENT& scan)
+{
+    std::string json;
+    char numBuf[32];
+
+    static const char* scanTypeNames[] = { "OnAccess", "OnDemand", "Memory" };
+
+    json += "{\"scanType\":\"";
+    json += SafeLookup(scanTypeNames,
+        (int)(sizeof(scanTypeNames) / sizeof(scanTypeNames[0])),
+        scan.ScanType);
+    json += "\"";
+
+    json += ",\"targetPath\":\"";
+    json += EscapeJson(WcharToUtf8(scan.TargetPath));
+    json += "\"";
+
+    json += ",\"targetProcessId\":";
+    _snprintf_s(numBuf, sizeof(numBuf), _TRUNCATE, "%lu", scan.TargetProcessId);
+    json += numBuf;
+
+    json += ",\"isMatch\":";
+    json += scan.IsMatch ? "true" : "false";
+
+    if (scan.IsMatch && scan.YaraRule[0] != '\0') {
+        json += ",\"yaraRule\":\"";
+        json += EscapeJson(std::string(scan.YaraRule));
+        json += "\"";
+    }
+
+    if (scan.Sha256Hex[0] != '\0') {
+        json += ",\"sha256\":\"";
+        json += scan.Sha256Hex;
+        json += "\"";
     }
 
     json += '}';

@@ -22,6 +22,7 @@ add_executable(sentinel-agent
     etw/provider_rpc.cpp
     etw/provider_kernelprocess.cpp
     amsi/amsi_register.cpp
+    scanner/yara_scanner.cpp
 )
 
 target_include_directories(sentinel-agent PRIVATE
@@ -33,7 +34,8 @@ target_include_directories(sentinel-agent PRIVATE
 # advapi32.lib — Service control manager, token queries, ETW (StartTrace, EnableTraceEx2, etc.)
 # ole32.lib — CoCreateGuid (SentinelEventInit)
 # tdh.lib — Trace Data Helper (ETW event parsing, future use)
-target_link_libraries(sentinel-agent PRIVATE fltLib.lib advapi32.lib ole32.lib tdh.lib)
+# libyara — YARA pattern matching engine (P8-T1)
+target_link_libraries(sentinel-agent PRIVATE fltLib.lib advapi32.lib ole32.lib tdh.lib libyara)
 
 set_target_properties(sentinel-agent PROPERTIES
     CXX_STANDARD 20
@@ -41,4 +43,4 @@ set_target_properties(sentinel-agent PROPERTIES
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 
-message(STATUS "sentinel-agent: Configured (agent service with pipeline)")
+message(STATUS "sentinel-agent: Configured (agent service with pipeline + YARA scanner)")

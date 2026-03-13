@@ -24,6 +24,7 @@
 #include "rules/rule_engine.h"
 #include "rules/sequence_engine.h"
 #include "rules/threshold_engine.h"
+#include "scanner/yara_scanner.h"
 
 class EventProcessor {
 public:
@@ -49,6 +50,9 @@ public:
     /* Shut down the processor, flush and close the log file. */
     void Shutdown();
 
+    /* Access the YARA scanner (for on-demand scans, hot-reload from CLI). */
+    YaraScanner& GetYaraScanner() { return m_yaraScanner; }
+
     /* Total events processed since Init. */
     ULONGLONG EventsProcessed() const { return m_eventsProcessed; }
 
@@ -62,6 +66,7 @@ private:
     SequenceEngine    m_sequenceEngine;
     ThresholdEngine   m_thresholdEngine;
     JsonWriter        m_jsonWriter;
+    YaraScanner       m_yaraScanner;
     ULONGLONG       m_eventsProcessed = 0;
 
     void PrintSummary(const SENTINEL_EVENT& evt);

@@ -24,12 +24,18 @@ EventProcessor::Init(const char* logPath)
     m_sequenceEngine.Init("C:\\SentinelPOC\\rules");
     m_thresholdEngine.Init("C:\\SentinelPOC\\rules");
 
+    /* Initialize YARA scanner (P8-T1) */
+    if (!m_yaraScanner.Init("C:\\SentinelPOC\\yara-rules")) {
+        std::printf("SentinelAgent: WARNING: YARA scanner init failed\n");
+    }
+
     return m_jsonWriter.Open(logPath);
 }
 
 void
 EventProcessor::Shutdown()
 {
+    m_yaraScanner.Shutdown();
     m_jsonWriter.Close();
 }
 
@@ -238,6 +244,18 @@ EventProcessor::PrintSummary(const SENTINEL_EVENT& evt)
                     amsi.AppName,
                     amsi.ScanResult,
                     amsi.ContentSize);
+    } else if (evt.Source == SentinelSourceScanner) {
+        const auto& scan = evt.Payload.Scanner;
+        static const char* scanTypeNames[] = { "OnAccess", "OnDemand", "Memory" };
+        const char* typeName = (scan.ScanType >= 0 && scan.ScanType <= 2)
+            ? scanTypeNames[scan.ScanType] : "Unknown";
+        std::printf("[%llu] source=%s type=%s path=%S match=%s rule=%s\n",
+                    m_eventsProcessed,
+                    SourceName(evt.Source),
+                    typeName,
+                    scan.TargetPath,
+                    scan.IsMatch ? "YES" : "no",
+                    scan.IsMatch ? scan.YaraRule : "(none)");
     } else if (evt.Source == SentinelSourceDriverProcess) {
         const auto& proc = evt.Payload.Process;
         std::printf("[%llu] source=%s %s pid=%lu ppid=%lu\n",

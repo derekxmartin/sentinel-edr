@@ -382,13 +382,12 @@ ProcessorThread()
         }
     }
 
-    /* Drain remaining events */
-    {
-        SENTINEL_EVENT event = {};
-        while (g_EventQueue.Pop(event, 0)) {
-            g_EventProcessor.Process(event);
-        }
-    }
+    /*
+     * Discard remaining queued events on shutdown.
+     * Processing the full backlog (thousands of hook/minifilter events)
+     * would block the shutdown for minutes.  All events up to this point
+     * have already been written to the JSON log.
+     */
 
     AgentLog("SentinelAgent: Processing thread stopped (%llu events)\n",
              g_EventProcessor.EventsProcessed());

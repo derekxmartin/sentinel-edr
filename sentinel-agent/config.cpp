@@ -3,6 +3,7 @@
  * INI config file parser and serializer.
  *
  * P9-T3: Configuration File.
+ * P9-T4: Rules Update (git repo URLs).
  */
 
 #include "config.h"
@@ -123,6 +124,10 @@ ConfigSetDefaults(SentinelConfig& cfg)
     cfg.scanCacheTtlSec    = 300;                 /* 5 minutes */
     cfg.logMaxSizeBytes    = 100 * 1024 * 1024;   /* 100 MB */
     cfg.netMaxEventsPerSec = 100;
+
+    /* [git] — no default repo URLs */
+    cfg.rulesRepoUrl[0]     = '\0';
+    cfg.yaraRulesRepoUrl[0] = '\0';
 }
 
 /* ── ConfigLoad ─────────────────────────────────────────────────────────── */
@@ -192,6 +197,17 @@ ConfigLoad(SentinelConfig& cfg, const char* path)
     cfg.netMaxEventsPerSec = IniGetUint(ini, "network", "max_events_per_sec",
                                         cfg.netMaxEventsPerSec);
 
+    /* [git] */
+    val = IniGet(ini, "git", "rules_repo_url");
+    if (!val.empty()) {
+        strcpy_s(cfg.rulesRepoUrl, val.c_str());
+    }
+
+    val = IniGet(ini, "git", "yara_rules_repo_url");
+    if (!val.empty()) {
+        strcpy_s(cfg.yaraRulesRepoUrl, val.c_str());
+    }
+
     return true;
 }
 
@@ -224,14 +240,18 @@ ConfigToJson(const SentinelConfig& cfg)
     std::string rulesDir     = cfg.rulesDir;
     std::string yaraRulesDir = cfg.yaraRulesDir;
     std::string configFile   = cfg.configFilePath;
+    std::string rulesRepo    = cfg.rulesRepoUrl;
+    std::string yaraRepo     = cfg.yaraRulesRepoUrl;
 
     JsonEscape(logPath);
     JsonEscape(amsiDll);
     JsonEscape(rulesDir);
     JsonEscape(yaraRulesDir);
     JsonEscape(configFile);
+    JsonEscape(rulesRepo);
+    JsonEscape(yaraRepo);
 
-    char buf[2048];
+    char buf[4096];
     _snprintf_s(buf, sizeof(buf), _TRUNCATE,
         "{"
         "\"config_file\":\"%s\","
@@ -251,6 +271,10 @@ ConfigToJson(const SentinelConfig& cfg)
         "},"
         "\"network\":{"
             "\"max_events_per_sec\":%u"
+        "},"
+        "\"git\":{"
+            "\"rules_repo_url\":\"%s\","
+            "\"yara_rules_repo_url\":\"%s\""
         "}"
         "}",
         configFile.c_str(),
@@ -262,7 +286,9 @@ ConfigToJson(const SentinelConfig& cfg)
         cfg.scanMaxRegionSize / (1024 * 1024),
         cfg.scanCacheTtlSec,
         cfg.logMaxSizeBytes / (1024 * 1024),
-        cfg.netMaxEventsPerSec);
+        cfg.netMaxEventsPerSec,
+        rulesRepo.c_str(),
+        yaraRepo.c_str());
 
     return buf;
 }

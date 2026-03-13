@@ -213,6 +213,9 @@ CommandHandler::HandleClient(HANDLE hPipe)
     case SentinelCmdConfig:
         json = HandleConfig();
         break;
+    case SentinelCmdRulesUpdate:
+        json = HandleRulesUpdate();
+        break;
     default:
         json = "{\"error\":\"Unknown command\"}";
         status = 1;
@@ -641,4 +644,38 @@ CommandHandler::HandleConfig()
         return ConfigToJson(*m_config);
     }
     return "{\"error\":\"Configuration not available\"}";
+}
+
+/* ── HandleRulesUpdate (P9-T4) ─────────────────────────────────────────── */
+
+std::string
+CommandHandler::HandleRulesUpdate()
+{
+    RulesUpdateResult res = m_processor->ValidateAndReloadRules();
+
+    char buf[2048];
+
+    if (!res.validated) {
+        /* Escape the error message for JSON */
+        std::string escapedErr;
+        for (char c : res.error) {
+            if (c == '"')       escapedErr += "\\\"";
+            else if (c == '\\') escapedErr += "\\\\";
+            else                escapedErr += c;
+        }
+
+        _snprintf_s(buf, sizeof(buf), _TRUNCATE,
+            "{\"validated\":false,\"reloaded\":false,"
+            "\"error\":\"%s\"}",
+            escapedErr.c_str());
+    } else {
+        _snprintf_s(buf, sizeof(buf), _TRUNCATE,
+            "{\"validated\":true,\"reloaded\":true,"
+            "\"single\":%d,\"sequence\":%d,"
+            "\"threshold\":%d,\"yara\":%d}",
+            res.singleCount, res.sequenceCount,
+            res.thresholdCount, res.yaraCount);
+    }
+
+    return buf;
 }

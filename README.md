@@ -53,6 +53,7 @@ SentinelPOC instruments a Windows system at every layer — kernel callbacks, in
 - **Memory scanning** for unbacked executable regions (shellcode injection detection)
 - **Three-tier detection engine**: single-event rules, time-ordered sequence rules, and threshold-based alerting
 - **14 YARA rules** detecting Cobalt Strike, Mimikatz, packed binaries, suspicious PE characteristics, and XLL shellcode
+- **Git-based rule updates** with dry-run validation and automatic rollback on failure
 - **CLI management tool** for real-time status, alerts, process inspection, network connections, and configuration queries
 - **INI-style configuration file** with runtime-tunable paths, scanner limits, and thresholds
 - **JSON-lines telemetry logging** with automatic rotation
@@ -125,12 +126,36 @@ sentinel-cli <command> [args] [--json]
 | `alerts [N]` | Show last N alerts with severity, rule name, trigger, and PID (default: 20) |
 | `scan <path>` | Trigger on-demand YARA scan on a file |
 | `rules reload` | Hot-reload behavioral and YARA rules from disk |
+| `rules update` | Git pull latest rules, validate, and hot-reload (rollback on failure) |
+| `rules update --init` | Clone rule repos for first-time setup (requires `--rules-repo` and `--yara-repo`) |
 | `connections` | Network connection table: remote IP, port, protocol, hit count, PIDs |
 | `processes` | Tracked processes with PPID, integrity level, elevation status |
 | `hooks` | Hook DLL injection status per tracked process |
 | `config` | Show active agent configuration (paths, scanner limits, thresholds) |
 
 Add `--json` to any command for raw JSON output suitable for scripting and SIEM ingestion.
+
+### Rules Update Workflow
+
+The `rules update` command provides a safe, one-command workflow for deploying signature updates:
+
+```powershell
+# First-time setup: clone rule repositories
+sentinel-cli rules update --init --rules-repo https://github.com/org/rules.git --yara-repo https://github.com/org/yara-rules.git
+
+# Subsequent updates: pull, validate, reload
+sentinel-cli rules update
+```
+
+The update process:
+1. Saves current HEAD SHA for rollback
+2. Runs `git pull --ff-only` on both rule directories
+3. Sends validate-and-reload command to the agent
+4. Agent dry-run parses all rules (detection + YARA) without activating
+5. On success: hot-reloads rules into the running agent
+6. On failure: CLI rolls back via `git reset --hard` — old rules remain active
+
+YARA files using unsupported modules (e.g., `cuckoo`, `androguard`) are automatically skipped during compilation, allowing compatibility with community rulesets like [Yara-Rules](https://github.com/Yara-Rules/rules).
 
 ---
 
@@ -157,6 +182,10 @@ max_log_size_mb = 100        # Log rotation threshold
 
 [network]
 max_events_per_sec = 100     # Per-PID network event rate limit
+
+[git]
+# rules_repo_url = https://github.com/org/sentinel-rules.git
+# yara_rules_repo_url = https://github.com/org/sentinel-yara-rules.git
 ```
 
 Query the running agent's active config with `sentinel-cli config`.
@@ -405,7 +434,7 @@ claude-edr/
 │   ├── config.h               SentinelConfig struct + API
 │   ├── pipeline.cpp           Event queue + receiver threads
 │   ├── event_processor.cpp    Event routing + enrichment
-│   ├── cmd_handler.cpp        CLI command dispatch (8 commands)
+│   ├── cmd_handler.cpp        CLI command dispatch (9 commands)
 │   ├── json_writer.cpp        JSON-lines log output + rotation
 │   ├── network_table.cpp      Connection tracking table
 │   ├── scanner/
@@ -416,14 +445,15 @@ claude-edr/
 │   │   ├── rule_engine.cpp    Single-event rule evaluation
 │   │   ├── sequence_engine.cpp  Time-ordered sequence detection
 │   │   ├── threshold_engine.cpp  Count-based alerting
-│   │   └── rule_parser.cpp    YAML rule loading
+│   │   ├── rule_parser.cpp    YAML rule loading
+│   │   └── rule_validator.cpp Dry-run rule validation
 │   ├── etw/
 │   │   └── etw_consumer.cpp   ETW trace session + 8 providers
 │   └── amsi/
 │       └── amsi_provider.cpp  Custom AMSI COM provider
 ├── sentinel-amsi/             AMSI provider DLL host
 ├── sentinel-cli/              CLI management tool
-│   └── main.cpp               8 commands + pretty-printers
+│   └── main.cpp               9 commands + git operations + pretty-printers
 ├── yara-rules/                YARA detection rules (14 rules)
 ├── rules/                     YAML behavioral rules (5 rules)
 ├── tests/                     Integration tests

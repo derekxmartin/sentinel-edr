@@ -146,7 +146,8 @@ typedef enum _SENTINEL_CMD_TYPE {
     SentinelCmdConnections  = 5,
     SentinelCmdProcesses    = 6,
     SentinelCmdHooks        = 7,
-    SentinelCmdConfig       = 8
+    SentinelCmdConfig       = 8,
+    SentinelCmdRulesUpdate  = 9
 } SENTINEL_CMD_TYPE;
 
 #define SENTINEL_CMD_MAX_ARG    512

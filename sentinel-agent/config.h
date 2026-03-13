@@ -7,6 +7,7 @@
  * overlay values from an INI-style file (sentinel.conf).
  *
  * P9-T3: Configuration File.
+ * P9-T4: Rules Update (git repo URLs).
  */
 
 #ifndef SENTINEL_CONFIG_H
@@ -34,6 +35,10 @@ struct SentinelConfig {
 
     /* [network] */
     UINT32      netMaxEventsPerSec;
+
+    /* [git] — rule repository URLs for `rules update --init` */
+    char        rulesRepoUrl[512];
+    char        yaraRulesRepoUrl[512];
 
     /* Meta — which file was loaded (empty string if defaults) */
     char        configFilePath[MAX_PATH];

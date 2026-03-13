@@ -8,6 +8,7 @@
  * P9-T1: Core CLI Commands.
  * P9-T2: Inspection Commands (connections, processes, hooks).
  * P9-T3: Configuration query command.
+ * P9-T4: Rules update (validate-and-reload).
  * Book reference: Chapter 1 — Agent Design.
  */
 
@@ -67,6 +68,9 @@ private:
 
     /* P9-T3: Configuration query */
     std::string HandleConfig();
+
+    /* P9-T4: Rules update (validate + reload) */
+    std::string HandleRulesUpdate();
 
     /* Send a SENTINEL_IPC_COMMAND_REPLY with JSON payload. */
     bool SendReply(HANDLE hPipe, UINT32 cmdType, UINT32 status,

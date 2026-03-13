@@ -27,6 +27,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
+#include <vector>
 
 /* ── Callback data passed through YARA scan ─────────────────────────────── */
 
@@ -291,6 +293,43 @@ YaraScanner::IsReady() const
     return m_initialized && m_rules != nullptr;
 }
 
+/* ── Recursive .yar file enumeration ───────────────────────────────────── */
+
+static void
+FindYarFilesRecursive(const std::string& dir, std::vector<std::string>& out)
+{
+    std::string pattern = dir + "\\*";
+    WIN32_FIND_DATAA findData;
+    HANDLE hFind = FindFirstFileA(pattern.c_str(), &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE) return;
+
+    do {
+        if (strcmp(findData.cFileName, ".") == 0 ||
+            strcmp(findData.cFileName, "..") == 0)
+            continue;
+
+        std::string fullPath = dir + "\\" + findData.cFileName;
+
+        if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            if (strcmp(findData.cFileName, ".git") != 0) {
+                FindYarFilesRecursive(fullPath, out);
+            }
+            continue;
+        }
+
+        size_t len = strlen(findData.cFileName);
+        bool isYar = (len > 4 && _stricmp(findData.cFileName + len - 4, ".yar") == 0) ||
+                     (len > 5 && _stricmp(findData.cFileName + len - 5, ".yara") == 0);
+
+        if (isYar && strstr(findData.cFileName, "index") == nullptr) {
+            out.push_back(fullPath);
+        }
+    } while (FindNextFileA(hFind, &findData));
+
+    FindClose(hFind);
+}
+
 /* ── CompileRulesFromDir ────────────────────────────────────────────────── */
 
 YR_RULES*
@@ -298,6 +337,66 @@ YaraScanner::CompileRulesFromDir(int& outRuleCount)
 {
     outRuleCount = 0;
 
+    /* Recursively find all .yar/.yara files (skip index files) */
+    std::vector<std::string> yarFiles;
+    FindYarFilesRecursive(m_rulesDir, yarFiles);
+
+    if (yarFiles.empty()) {
+        std::printf("[YARA] No .yar files found in %s\n", m_rulesDir.c_str());
+        return nullptr;
+    }
+
+    /*
+     * Two-pass compilation:
+     * Pass 1: Test each file independently to identify compatible files.
+     * Pass 2: Compile all compatible files into a single YR_RULES.
+     *
+     * This handles community repos that include rules requiring modules
+     * (cuckoo, androguard, etc.) not compiled into our libyara.
+     */
+
+    /* Pass 1: filter to compatible files */
+    std::vector<std::string> goodFiles;
+
+    for (const auto& filePath : yarFiles) {
+        FILE* fp = nullptr;
+        fopen_s(&fp, filePath.c_str(), "r");
+        if (!fp) continue;
+
+        const char* fileName = strrchr(filePath.c_str(), '\\');
+        fileName = fileName ? fileName + 1 : filePath.c_str();
+
+        YR_COMPILER* testCompiler = nullptr;
+        int rc = yr_compiler_create(&testCompiler);
+        if (rc != ERROR_SUCCESS || !testCompiler) {
+            fclose(fp);
+            continue;
+        }
+
+        /* Silence errors during probe */
+        yr_compiler_set_callback(testCompiler, CompilerErrorCallback, nullptr);
+
+        int errors = yr_compiler_add_file(testCompiler, fp, nullptr, fileName);
+        fclose(fp);
+        yr_compiler_destroy(testCompiler);
+
+        if (errors == 0) {
+            goodFiles.push_back(filePath);
+        } else {
+            std::printf("[YARA] Skipping incompatible: %s\n", fileName);
+        }
+    }
+
+    if (goodFiles.empty()) {
+        std::printf("[YARA] No compatible .yar files in %s\n",
+                    m_rulesDir.c_str());
+        return nullptr;
+    }
+
+    std::printf("[YARA] %zu/%zu files compatible\n",
+                goodFiles.size(), yarFiles.size());
+
+    /* Pass 2: compile all compatible files into one ruleset */
     YR_COMPILER* compiler = nullptr;
     int rc = yr_compiler_create(&compiler);
 
@@ -308,47 +407,16 @@ YaraScanner::CompileRulesFromDir(int& outRuleCount)
 
     yr_compiler_set_callback(compiler, CompilerErrorCallback, nullptr);
 
-    /* Enumerate *.yar files in the rules directory */
-    std::string pattern = m_rulesDir + "\\*.yar";
-    WIN32_FIND_DATAA findData;
-    HANDLE hFind = FindFirstFileA(pattern.c_str(), &findData);
+    for (const auto& filePath : goodFiles) {
+        FILE* fp = nullptr;
+        fopen_s(&fp, filePath.c_str(), "r");
+        if (!fp) continue;
 
-    int filesAdded = 0;
+        const char* fileName = strrchr(filePath.c_str(), '\\');
+        fileName = fileName ? fileName + 1 : filePath.c_str();
 
-    if (hFind != INVALID_HANDLE_VALUE) {
-        do {
-            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-                continue;
-
-            std::string fullPath = m_rulesDir + "\\" + findData.cFileName;
-            FILE* fp = nullptr;
-            fopen_s(&fp, fullPath.c_str(), "r");
-
-            if (!fp) {
-                std::printf("[YARA] Cannot open rule file: %s\n",
-                            fullPath.c_str());
-                continue;
-            }
-
-            int errors = yr_compiler_add_file(
-                compiler, fp, nullptr, findData.cFileName);
-
-            fclose(fp);
-
-            if (errors > 0) {
-                std::printf("[YARA] %d error(s) in %s\n",
-                            errors, findData.cFileName);
-            } else {
-                filesAdded++;
-            }
-        } while (FindNextFileA(hFind, &findData));
-
-        FindClose(hFind);
-    }
-
-    if (filesAdded == 0) {
-        yr_compiler_destroy(compiler);
-        return nullptr;
+        yr_compiler_add_file(compiler, fp, nullptr, fileName);
+        fclose(fp);
     }
 
     /* Extract compiled rules */

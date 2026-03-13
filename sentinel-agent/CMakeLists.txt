@@ -12,6 +12,7 @@ add_executable(sentinel-agent
     json_writer.cpp
     rules/rule_engine.cpp
     rules/rule_parser.cpp
+    rules/rule_validator.cpp
     rules/sequence_engine.cpp
     rules/threshold_engine.cpp
     etw/etw_consumer.cpp

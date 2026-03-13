@@ -13,6 +13,7 @@
  * P6-T3: Connection Table.
  * P9-T1: CLI command support (alert history, rule reload, on-demand scan).
  * P9-T3: Configuration file support.
+ * P9-T4: Rules Update (validate-and-reload).
  */
 
 #ifndef SENTINEL_EVENT_PROCESSOR_H
@@ -41,6 +42,17 @@ struct RuleCountSummary {
     size_t sequence;
     size_t threshold;
     int    yara;
+};
+
+/* P9-T4: Result of validate-and-reload operation */
+struct RulesUpdateResult {
+    bool        validated;
+    bool        reloaded;
+    int         singleCount;
+    int         sequenceCount;
+    int         thresholdCount;
+    int         yaraCount;
+    std::string error;
 };
 
 class EventProcessor {
@@ -89,6 +101,13 @@ public:
      * Returns true if all three engines reloaded successfully.
      */
     bool ReloadRules();
+
+    /*
+     * P9-T4: Validate rules first (dry-run parse), then reload if valid.
+     * Returns detailed result with validation status and rule counts.
+     * On failure, old rules remain active.
+     */
+    RulesUpdateResult ValidateAndReloadRules();
 
     /* Get counts from all rule engines. */
     RuleCountSummary GetRuleCounts() const;

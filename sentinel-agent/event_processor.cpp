@@ -9,6 +9,7 @@
  */
 
 #include "event_processor.h"
+#include "rules/rule_validator.h"
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -335,6 +336,49 @@ EventProcessor::ReloadRules()
                 m_thresholdEngine.RuleCount());
 
     return ok;
+}
+
+RulesUpdateResult
+EventProcessor::ValidateAndReloadRules()
+{
+    RulesUpdateResult res = {};
+
+    /* Phase 1: Validate detection rules (dry-run parse) */
+    ValidationResult detResult = ValidateDetectionRules(m_config.rulesDir);
+    if (!detResult.success) {
+        res.validated = false;
+        res.error     = detResult.error;
+        return res;
+    }
+
+    /* Phase 2: Validate YARA rules (dry-run compile) */
+    ValidationResult yaraResult = ValidateYaraRules(m_config.yaraRulesDir);
+    if (!yaraResult.success) {
+        res.validated = false;
+        res.error     = yaraResult.error;
+        return res;
+    }
+
+    res.validated = true;
+
+    /* Phase 3: Reload — detection rules */
+    ReloadRules();
+
+    /* Phase 4: Reload — YARA rules (atomic swap) */
+    m_yaraScanner.Reload();
+
+    res.reloaded       = true;
+    res.singleCount    = (int)m_ruleEngine.RuleCount();
+    res.sequenceCount  = (int)m_sequenceEngine.RuleCount();
+    res.thresholdCount = (int)m_thresholdEngine.RuleCount();
+    res.yaraCount      = m_yaraScanner.RuleCount();
+
+    std::printf("SentinelAgent: Rules update — validated and reloaded "
+                "(single=%d seq=%d thr=%d yara=%d)\n",
+                res.singleCount, res.sequenceCount,
+                res.thresholdCount, res.yaraCount);
+
+    return res;
 }
 
 bool

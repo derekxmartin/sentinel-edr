@@ -10,6 +10,7 @@
  *   alerts [N]     — show last N alerts (default 20)
  *   scan <path>    — trigger on-demand YARA scan
  *   rules reload   — hot-reload detection rules
+ *   rules update   — git pull + validate + hot-reload (P9-T4)
  *   connections    — show network connection table
  *   processes      — list tracked processes with metadata
  *   hooks          — show hook DLL status per process
@@ -22,6 +23,7 @@
  * P9-T1: Core CLI Commands.
  * P9-T2: Inspection Commands.
  * P9-T3: Configuration command.
+ * P9-T4: Rules update command.
  * Book reference: Chapter 1 — Agent Design, SOC Workflow.
  */
 
@@ -50,6 +52,7 @@ PrintUsage()
         "  alerts [N]       Show last N alerts (default: 20)\n"
         "  scan <path>      Trigger on-demand YARA scan on a file\n"
         "  rules reload     Hot-reload detection rules from disk\n"
+        "  rules update     Git pull + validate + hot-reload rules\n"
         "  connections      Show network connection table\n"
         "  processes        List tracked processes with integrity level\n"
         "  hooks            Show hook DLL status per process\n"
@@ -469,6 +472,343 @@ PrintHooks(const std::string& json)
     }
 }
 
+/* ── P9-T4: Git helper and rules update ──────────────────────────────────── */
+
+/*
+ * Run a git command and capture stdout.
+ * Returns the process exit code, or -1 on launch failure.
+ */
+static int
+RunGit(const std::string& args, std::string& output)
+{
+    output.clear();
+
+    /* Use cmd /c to leverage shell PATH resolution for git */
+    std::string cmdLine = "cmd /c git " + args;
+
+    /* Set up stdout capture via pipe */
+    SECURITY_ATTRIBUTES sa = {};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+
+    HANDLE hReadPipe = nullptr, hWritePipe = nullptr;
+    if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
+        output = "CreatePipe failed";
+        return -1;
+    }
+
+    /* Don't let the read end be inherited */
+    SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOA si = {};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = hWritePipe;
+    si.hStdError  = hWritePipe;
+    si.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
+
+    PROCESS_INFORMATION pi = {};
+
+    BOOL ok = CreateProcessA(
+        nullptr,
+        const_cast<char*>(cmdLine.c_str()),
+        nullptr, nullptr,
+        TRUE,                   /* inherit handles */
+        CREATE_NO_WINDOW,
+        nullptr, nullptr,
+        &si, &pi);
+
+    /* Close write end in parent so ReadFile sees EOF when child exits */
+    CloseHandle(hWritePipe);
+
+    if (!ok) {
+        DWORD err = GetLastError();
+        output = "CreateProcess failed (error " + std::to_string(err) + ")";
+        CloseHandle(hReadPipe);
+        return -1;
+    }
+
+    /* Read stdout */
+    char buf[4096];
+    DWORD bytesRead;
+    while (ReadFile(hReadPipe, buf, sizeof(buf) - 1, &bytesRead, nullptr)
+           && bytesRead > 0) {
+        buf[bytesRead] = '\0';
+        output += buf;
+    }
+
+    CloseHandle(hReadPipe);
+
+    WaitForSingleObject(pi.hProcess, 30000);
+
+    DWORD exitCode = (DWORD)-1;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    return (int)exitCode;
+}
+
+/*
+ * Check if a directory contains a .git subdirectory.
+ */
+static bool
+IsGitRepo(const std::string& dir)
+{
+    std::string gitDir = dir + "\\.git";
+    DWORD attr = GetFileAttributesA(gitDir.c_str());
+    return (attr != INVALID_FILE_ATTRIBUTES
+            && (attr & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+/*
+ * Get the current HEAD SHA of a git repo.
+ */
+static std::string
+GitGetHead(const std::string& dir)
+{
+    std::string output;
+    std::string args = "-C \"" + dir + "\" rev-parse HEAD";
+    int rc = RunGit(args, output);
+    if (rc != 0) return "";
+
+    /* Trim trailing whitespace */
+    while (!output.empty() &&
+           (output.back() == '\n' || output.back() == '\r'))
+        output.pop_back();
+    return output;
+}
+
+/*
+ * Run `rules update` command.
+ * Returns 0 on success, 1 on failure.
+ * Handles git pull, agent validation, and rollback.
+ */
+static int
+DoRulesUpdate(bool jsonOutput)
+{
+    /* Default rule directories */
+    const std::string rulesDir     = "C:\\SentinelPOC\\rules";
+    const std::string yaraRulesDir = "C:\\SentinelPOC\\yara-rules";
+
+    struct RepoInfo {
+        std::string dir;
+        std::string name;
+        std::string savedHead;
+    };
+
+    RepoInfo repos[] = {
+        { rulesDir,     "detection rules", "" },
+        { yaraRulesDir, "YARA rules",      "" },
+    };
+
+    /* 1. Verify both directories are git repos */
+    for (auto& repo : repos) {
+        if (!IsGitRepo(repo.dir)) {
+            std::fprintf(stderr,
+                "Error: %s is not a git repository.\n"
+                "Run 'sentinel-cli rules update --init "
+                "--rules-repo <url> --yara-repo <url>' first.\n",
+                repo.dir.c_str());
+            return 1;
+        }
+    }
+
+    /* 2. Save HEAD SHAs for rollback */
+    for (auto& repo : repos) {
+        repo.savedHead = GitGetHead(repo.dir);
+        if (repo.savedHead.empty()) {
+            std::fprintf(stderr,
+                "Error: Cannot read HEAD for %s\n", repo.dir.c_str());
+            return 1;
+        }
+    }
+
+    /* 3. Git pull both repos */
+    for (auto& repo : repos) {
+        std::printf("Pulling %s (%s)...\n", repo.name.c_str(),
+                    repo.dir.c_str());
+
+        std::string output;
+        std::string args = "-C \"" + repo.dir + "\" pull --ff-only";
+        int rc = RunGit(args, output);
+
+        if (rc != 0) {
+            std::fprintf(stderr, "Error: git pull failed for %s:\n%s\n",
+                        repo.dir.c_str(), output.c_str());
+            /* Rollback already-pulled repos */
+            for (auto& r : repos) {
+                if (!r.savedHead.empty() && IsGitRepo(r.dir)) {
+                    std::string resetArgs = "-C \"" + r.dir
+                        + "\" reset --hard " + r.savedHead;
+                    std::string dummy;
+                    RunGit(resetArgs, dummy);
+                }
+            }
+            return 1;
+        }
+
+        /* Trim and show output */
+        while (!output.empty() &&
+               (output.back() == '\n' || output.back() == '\r'))
+            output.pop_back();
+        std::printf("  %s\n", output.c_str());
+    }
+
+    /* 4. Send validate-and-reload command to agent */
+    std::printf("Validating and reloading...\n");
+
+    HANDLE hPipe = ConnectToAgent();
+    if (hPipe == INVALID_HANDLE_VALUE) {
+        std::fprintf(stderr,
+            "Error: Cannot connect to agent for validation.\n"
+            "Rolling back...\n");
+        for (auto& r : repos) {
+            std::string args = "-C \"" + r.dir
+                + "\" reset --hard " + r.savedHead;
+            std::string dummy;
+            RunGit(args, dummy);
+        }
+        return 1;
+    }
+
+    std::string json = SendCommand(hPipe, SentinelCmdRulesUpdate, nullptr);
+    CloseHandle(hPipe);
+
+    if (json.empty()) {
+        std::fprintf(stderr, "Error: No response from agent.\n");
+        return 1;
+    }
+
+    /* 5. Check validation result */
+    std::string validated = JsonGetValue(json, "validated");
+
+    if (validated != "true") {
+        /* Validation failed — rollback */
+        std::string error = JsonGetString(json, "error");
+        std::fprintf(stderr, "Validation FAILED: %s\n", error.c_str());
+        std::fprintf(stderr, "Rolling back git changes...\n");
+
+        for (auto& r : repos) {
+            std::string args = "-C \"" + r.dir
+                + "\" reset --hard " + r.savedHead;
+            std::string dummy;
+            RunGit(args, dummy);
+        }
+
+        std::fprintf(stderr, "Rollback complete. Old rules remain active.\n");
+        return 1;
+    }
+
+    /* 6. Success */
+    if (jsonOutput) {
+        std::printf("%s\n", json.c_str());
+    } else {
+        std::printf("Rules updated successfully.\n");
+        std::printf("  Single-event: %s\n", JsonGetValue(json, "single").c_str());
+        std::printf("  Sequence:     %s\n", JsonGetValue(json, "sequence").c_str());
+        std::printf("  Threshold:    %s\n", JsonGetValue(json, "threshold").c_str());
+        std::printf("  YARA:         %s\n", JsonGetValue(json, "yara").c_str());
+    }
+
+    return 0;
+}
+
+/*
+ * Run `rules update --init` command.
+ * Clones rule repos into the default directories.
+ */
+static int
+DoRulesInit(int argc, char* argv[], bool jsonOutput)
+{
+    /* Parse --rules-repo and --yara-repo from remaining args */
+    std::string rulesRepoUrl;
+    std::string yaraRepoUrl;
+
+    for (int i = 3; i < argc; i++) {
+        if (strcmp(argv[i], "--rules-repo") == 0 && i + 1 < argc) {
+            rulesRepoUrl = argv[++i];
+        } else if (strcmp(argv[i], "--yara-repo") == 0 && i + 1 < argc) {
+            yaraRepoUrl = argv[++i];
+        }
+    }
+
+    if (rulesRepoUrl.empty() || yaraRepoUrl.empty()) {
+        std::fprintf(stderr,
+            "Error: --init requires both repo URLs.\n"
+            "Usage: sentinel-cli rules update --init "
+            "--rules-repo <url> --yara-repo <url>\n");
+        return 1;
+    }
+
+    const std::string rulesDir     = "C:\\SentinelPOC\\rules";
+    const std::string yaraRulesDir = "C:\\SentinelPOC\\yara-rules";
+
+    struct CloneInfo {
+        std::string url;
+        std::string dir;
+        std::string name;
+    };
+
+    CloneInfo clones[] = {
+        { rulesRepoUrl,  rulesDir,     "detection rules" },
+        { yaraRepoUrl,   yaraRulesDir, "YARA rules"      },
+    };
+
+    for (auto& c : clones) {
+        if (IsGitRepo(c.dir)) {
+            std::printf("  %s: already initialized (%s)\n",
+                        c.name.c_str(), c.dir.c_str());
+            continue;
+        }
+
+        std::printf("Cloning %s from %s...\n", c.name.c_str(),
+                    c.url.c_str());
+
+        std::string output;
+        std::string args = "clone \"" + c.url + "\" \"" + c.dir + "\"";
+        int rc = RunGit(args, output);
+
+        if (rc != 0) {
+            std::fprintf(stderr, "Error: git clone failed:\n%s\n",
+                        output.c_str());
+            return 1;
+        }
+        std::printf("  Done.\n");
+    }
+
+    /* Send validate-and-reload to agent (if running) */
+    HANDLE hPipe = ConnectToAgent();
+    if (hPipe == INVALID_HANDLE_VALUE) {
+        std::printf("Agent not running. Rules will be loaded on next start.\n");
+        return 0;
+    }
+
+    std::string json = SendCommand(hPipe, SentinelCmdRulesUpdate, nullptr);
+    CloseHandle(hPipe);
+
+    if (!json.empty()) {
+        std::string validated = JsonGetValue(json, "validated");
+        if (validated == "true") {
+            if (jsonOutput) {
+                std::printf("%s\n", json.c_str());
+            } else {
+                std::printf("Rules loaded:\n");
+                std::printf("  Single-event: %s\n", JsonGetValue(json, "single").c_str());
+                std::printf("  Sequence:     %s\n", JsonGetValue(json, "sequence").c_str());
+                std::printf("  Threshold:    %s\n", JsonGetValue(json, "threshold").c_str());
+                std::printf("  YARA:         %s\n", JsonGetValue(json, "yara").c_str());
+            }
+        } else {
+            std::fprintf(stderr, "Warning: Rules validation failed: %s\n",
+                        JsonGetString(json, "error").c_str());
+        }
+    }
+
+    return 0;
+}
+
 /* ── P9-T3: Config printer ───────────────────────────────────────────────── */
 
 static void
@@ -512,6 +852,16 @@ PrintConfig(const std::string& json)
     std::printf("\n  [network]\n");
     std::printf("  Max events/s:  %s\n",
                 JsonGetValue(json, "max_events_per_sec").c_str());
+
+    std::string rulesRepo = JsonGetString(json, "rules_repo_url");
+    std::string yaraRepo  = JsonGetString(json, "yara_rules_repo_url");
+    if (!rulesRepo.empty() || !yaraRepo.empty()) {
+        std::printf("\n  [git]\n");
+        std::printf("  Rules repo:    %s\n",
+                    rulesRepo.empty() ? "(not configured)" : rulesRepo.c_str());
+        std::printf("  YARA repo:     %s\n",
+                    yaraRepo.empty() ? "(not configured)" : yaraRepo.c_str());
+    }
 }
 
 /* ── Main ────────────────────────────────────────────────────────────────── */
@@ -566,9 +916,23 @@ int main(int argc, char* argv[])
                             argument, SENTINEL_CMD_MAX_ARG);
 
     } else if (strcmp(command, "rules") == 0) {
-        if (argc < 3 || strcmp(argv[2], "reload") != 0) {
-            std::fprintf(stderr, "Error: expected 'rules reload'\n");
-            std::fprintf(stderr, "Usage: sentinel-cli rules reload\n");
+        if (argc < 3) {
+            std::fprintf(stderr, "Error: expected 'rules reload' or 'rules update'\n");
+            return 1;
+        }
+        if (strcmp(argv[2], "update") == 0) {
+            /* P9-T4: rules update handled separately (git + IPC) */
+            bool hasInit = false;
+            for (int i = 3; i < argc; i++) {
+                if (strcmp(argv[i], "--init") == 0) hasInit = true;
+            }
+            if (hasInit) {
+                return DoRulesInit(argc, argv, jsonOutput);
+            }
+            return DoRulesUpdate(jsonOutput);
+        }
+        if (strcmp(argv[2], "reload") != 0) {
+            std::fprintf(stderr, "Error: expected 'rules reload' or 'rules update'\n");
             return 1;
         }
         cmdType = SentinelCmdRulesReload;

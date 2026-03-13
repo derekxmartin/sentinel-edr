@@ -25,6 +25,7 @@
 #include "pipeline.h"
 #include "event_processor.h"
 #include "etw/etw_consumer.h"
+#include "amsi/amsi_register.h"
 #include "ipc.h"
 #include "ipc_serialize.h"
 #include "constants.h"
@@ -119,6 +120,10 @@ typedef struct _AGENT_FILTER_MSG {
     SENTINEL_FILTER_MSG     Body;
 } AGENT_FILTER_MSG;
 
+/* Global port handle so PipelineStop() can close it to unblock FilterGetMessage */
+static HANDLE g_DriverPort = INVALID_HANDLE_VALUE;
+static std::mutex g_DriverPortMutex;
+
 static void
 DriverPortReceiverThread()
 {
@@ -151,6 +156,12 @@ DriverPortReceiverThread()
         AgentLog("SentinelAgent: Connected to driver port\n");
         backoffMs = 1000;
 
+        /* Publish handle so PipelineStop() can close it to unblock us */
+        {
+            std::lock_guard<std::mutex> lock(g_DriverPortMutex);
+            g_DriverPort = hPort;
+        }
+
         /* Receive loop */
         while (!g_Shutdown.load()) {
             AGENT_FILTER_MSG    msg = {};
@@ -174,7 +185,15 @@ DriverPortReceiverThread()
             g_EventQueue.Push(msg.Body.Event);
         }
 
-        CloseHandle(hPort);
+        {
+            std::lock_guard<std::mutex> lock(g_DriverPortMutex);
+            if (g_DriverPort != INVALID_HANDLE_VALUE) {
+                /* PipelineStop() hasn't closed it yet — we close it */
+                g_DriverPort = INVALID_HANDLE_VALUE;
+                CloseHandle(hPort);
+            }
+            /* else: PipelineStop() already closed it to unblock us */
+        }
         hPort = INVALID_HANDLE_VALUE;
     }
 
@@ -398,6 +417,12 @@ PipelineStart()
                  "(ETW events will not be collected)\n");
     }
 
+    /* Register custom AMSI provider (after ETW so we can observe results) */
+    if (!AmsiProviderRegister(L"C:\\SentinelPOC\\sentinel-amsi.dll")) {
+        AgentLog("SentinelAgent: WARNING: AMSI provider registration failed "
+                 "(AMSI scanning will not be active)\n");
+    }
+
     /* Start threads */
     g_PortReceiverThread = std::thread(DriverPortReceiverThread);
     g_PipeListenerThread = std::thread(PipeListenerThread);
@@ -415,6 +440,9 @@ PipelineStop()
         SetEvent(g_ShutdownEvent);
     }
     g_EventQueue.Shutdown();
+
+    /* Unregister AMSI provider (before ETW stop so cleanup is clean) */
+    AmsiProviderUnregister();
 
     /* Stop ETW consumer first (unblocks ProcessTrace, joins its thread) */
     EtwConsumerStop();
@@ -434,12 +462,18 @@ PipelineStop()
         }
     }
 
+    /* Close driver port to unblock FilterGetMessage() */
+    {
+        std::lock_guard<std::mutex> lock(g_DriverPortMutex);
+        if (g_DriverPort != INVALID_HANDLE_VALUE) {
+            CloseHandle(g_DriverPort);
+            g_DriverPort = INVALID_HANDLE_VALUE;
+        }
+    }
+
     /* Join threads */
     if (g_PortReceiverThread.joinable()) {
-        /* Cancel FilterGetMessage blocking call */
-        if (g_PortReceiverThread.joinable()) {
-            g_PortReceiverThread.join();
-        }
+        g_PortReceiverThread.join();
     }
 
     if (g_PipeListenerThread.joinable()) {

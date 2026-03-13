@@ -310,6 +310,18 @@ DEFINE_GUID(SENTINEL_ETW_KERNEL_PROCESS,
     0x22FB2CD6, 0x0E7B, 0x422B,
     0xA0, 0xC7, 0x2F, 0xAD, 0x1F, 0xD0, 0xE7, 0x16);
 
+/* ── Custom AMSI Provider CLSID ─────────────────────────────────────────── */
+
+/*
+ * SentinelPOC custom AMSI provider — registered via IAntimalwareProvider.
+ * Windows loads this COM in-process server (sentinel-amsi.dll) into any
+ * AMSI-instrumented application (PowerShell, VBScript, JScript).
+ * {A3F5C8D2-7B1E-4A9F-8C6D-E5B2F1A47390}
+ */
+DEFINE_GUID(SENTINEL_AMSI_PROVIDER_CLSID,
+    0xA3F5C8D2, 0x7B1E, 0x4A9F,
+    0x8C, 0x6D, 0xE5, 0xB2, 0xF1, 0xA4, 0x73, 0x90);
+
 /* ── Close extern "C" ────────────────────────────────────────────────────── */
 
 #ifndef _KERNEL_MODE

@@ -40,6 +40,7 @@ endif()
 add_subdirectory(sentinel-hook)
 add_subdirectory(sentinel-agent)
 add_subdirectory(sentinel-cli)
+add_subdirectory(sentinel-amsi)
 
 # Tests
 enable_testing()

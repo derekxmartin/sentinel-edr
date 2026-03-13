@@ -21,6 +21,7 @@ add_executable(sentinel-agent
     etw/provider_amsi.cpp
     etw/provider_rpc.cpp
     etw/provider_kernelprocess.cpp
+    amsi/amsi_register.cpp
 )
 
 target_include_directories(sentinel-agent PRIVATE

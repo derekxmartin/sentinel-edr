@@ -1,0 +1,4 @@
+LIBRARY sentinel-amsi
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE

@@ -1,5 +1,9 @@
 # SentinelEDR
 
+<p align="center">
+  <img src="docs/logo.jpg" alt="SentinelEDR Logo" width="400">
+</p>
+
 A proof-of-concept Endpoint Detection & Response (EDR) agent for Windows x64, built from the ground up with kernel-mode telemetry, user-mode API hooking, YARA scanning, and a multi-layer detection engine.
 
 Architecture derived from sensor models in *Evading EDR* by Matt Hand (No Starch Press, 2023).

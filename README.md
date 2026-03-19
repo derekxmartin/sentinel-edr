@@ -1,4 +1,4 @@
-# SentinelEDR
+# AkesoEDR
 
 <p align="center">
   <img src="docs/logo.jpg" alt="SentinelEDR Logo" width="400">

@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Stop and uninstall the SentinelEDR kernel driver.
+    Stop and uninstall the AkesoEDR kernel driver.
 
 .DESCRIPTION
     1. Stops the driver service if running
@@ -9,7 +9,7 @@
     3. Optionally disables test-signing mode
 
 .PARAMETER ServiceName
-    Name of the driver service. Defaults to SentinelDrv.
+    Name of the driver service. Defaults to AkesoEDRDrv.
 
 .PARAMETER DisableTestSigning
     If specified, also disables test-signing mode (requires reboot).
@@ -19,13 +19,13 @@
 #>
 
 param(
-    [string]$ServiceName = "SentinelDrv",
+    [string]$ServiceName = "AkesoEDRDrv",
     [switch]$DisableTestSigning
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== SentinelEDR Driver Uninstall ===" -ForegroundColor Cyan
+Write-Host "=== AkesoEDR Driver Uninstall ===" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Step 1: Stop driver ----------------------------------------------------------

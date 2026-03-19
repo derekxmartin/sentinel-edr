@@ -36,7 +36,7 @@ int main()
 
     /*
      * Wait for hook DLL injection.
-     * The kernel driver injects sentinel-hook.dll via KAPC when kernel32
+     * The kernel driver injects akesoedr-hook.dll via KAPC when kernel32
      * loads.  By the time main() runs, the DLL *should* be present, but
      * the hooks still need a moment to initialise.  We poll for the
      * module (up to 3 seconds) then add a short settling delay.
@@ -44,8 +44,8 @@ int main()
     std::printf("[test_memscan] Waiting for hook DLL injection...\n");
     bool hookLoaded = false;
     for (int i = 0; i < 30; i++) {
-        if (GetModuleHandleA("sentinel-hook.dll") ||
-            GetModuleHandleA("sentinel-hook")) {
+        if (GetModuleHandleA("akesoedr-hook.dll") ||
+            GetModuleHandleA("akesoedr-hook")) {
             hookLoaded = true;
             break;
         }
@@ -57,8 +57,8 @@ int main()
     } else {
         std::printf("[test_memscan] WARNING: Hook DLL not detected after 3s — "
                     "sequence will not be captured\n");
-        std::printf("[test_memscan] Make sure sentinel-drv is loaded and "
-                    "sentinel-agent is running\n");
+        std::printf("[test_memscan] Make sure akesoedr-drv is loaded and "
+                    "akesoedr-agent is running\n");
     }
 
     /* 1. Allocate RW memory (triggers NtAllocateVirtualMemory hook) */

@@ -6,8 +6,8 @@
  * Usage:
  *   test_consumer.exe [--count N]
  *
- * The consumer connects to \SentinelPort via FilterConnectCommunicationPort,
- * then loops calling FilterGetMessage to receive SENTINEL_FILTER_MSG structs
+ * The consumer connects to \AkesoEDRPort via FilterConnectCommunicationPort,
+ * then loops calling FilterGetMessage to receive AKESOEDR_FILTER_MSG structs
  * sent by the driver via FltSendMessage.
  *
  * Press Ctrl+C to stop.
@@ -33,11 +33,11 @@
 
 /*
  * FilterGetMessage prepends FILTER_MESSAGE_HEADER to the message body.
- * The driver sends SENTINEL_FILTER_MSG as the body.
+ * The driver sends AKESOEDR_FILTER_MSG as the body.
  */
 typedef struct _CONSUMER_MESSAGE {
     FILTER_MESSAGE_HEADER   Header;
-    SENTINEL_FILTER_MSG     Body;
+    AKESOEDR_FILTER_MSG     Body;
 } CONSUMER_MESSAGE;
 
 /* ── Globals ────────────────────────────────────────────────────────────── */
@@ -59,35 +59,35 @@ static ULONG g_Errors           = 0;
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 
 static const char*
-SourceToString(SENTINEL_EVENT_SOURCE src)
+SourceToString(AKESOEDR_EVENT_SOURCE src)
 {
     switch (src) {
-    case SentinelSourceDriverProcess:   return "PROCESS";
-    case SentinelSourceDriverThread:    return "THREAD";
-    case SentinelSourceDriverObject:    return "OBJECT";
-    case SentinelSourceDriverImageLoad: return "IMAGELOAD";
-    case SentinelSourceDriverRegistry:  return "REGISTRY";
-    case SentinelSourceDriverMinifilter:return "FILE";
-    case SentinelSourceDriverNetwork:   return "NETWORK";
-    case SentinelSourceHookDll:         return "HOOK";
-    case SentinelSourceEtw:             return "ETW";
-    case SentinelSourceAmsi:            return "AMSI";
-    case SentinelSourceScanner:         return "SCANNER";
-    case SentinelSourceRuleEngine:      return "RULE";
-    case SentinelSourceSelfProtect:     return "TAMPER";
+    case AkesoEDRSourceDriverProcess:   return "PROCESS";
+    case AkesoEDRSourceDriverThread:    return "THREAD";
+    case AkesoEDRSourceDriverObject:    return "OBJECT";
+    case AkesoEDRSourceDriverImageLoad: return "IMAGELOAD";
+    case AkesoEDRSourceDriverRegistry:  return "REGISTRY";
+    case AkesoEDRSourceDriverMinifilter:return "FILE";
+    case AkesoEDRSourceDriverNetwork:   return "NETWORK";
+    case AkesoEDRSourceHookDll:         return "HOOK";
+    case AkesoEDRSourceEtw:             return "ETW";
+    case AkesoEDRSourceAmsi:            return "AMSI";
+    case AkesoEDRSourceScanner:         return "SCANNER";
+    case AkesoEDRSourceRuleEngine:      return "RULE";
+    case AkesoEDRSourceSelfProtect:     return "TAMPER";
     default:                            return "UNKNOWN";
     }
 }
 
 static const char*
-SeverityToString(SENTINEL_SEVERITY sev)
+SeverityToString(AKESOEDR_SEVERITY sev)
 {
     switch (sev) {
-    case SentinelSeverityInformational: return "INFO";
-    case SentinelSeverityLow:           return "LOW";
-    case SentinelSeverityMedium:        return "MEDIUM";
-    case SentinelSeverityHigh:          return "HIGH";
-    case SentinelSeverityCritical:      return "CRITICAL";
+    case AkesoEDRSeverityInformational: return "INFO";
+    case AkesoEDRSeverityLow:           return "LOW";
+    case AkesoEDRSeverityMedium:        return "MEDIUM";
+    case AkesoEDRSeverityHigh:          return "HIGH";
+    case AkesoEDRSeverityCritical:      return "CRITICAL";
     default:                            return "???";
     }
 }
@@ -121,9 +121,9 @@ FormatTimestamp(LARGE_INTEGER timestamp, char *buf, size_t bufSize)
 /* ── Event printers ─────────────────────────────────────────────────────── */
 
 static void
-PrintProcessEvent(const SENTINEL_EVENT *evt)
+PrintProcessEvent(const AKESOEDR_EVENT *evt)
 {
-    const SENTINEL_PROCESS_EVENT *p = &evt->Payload.Process;
+    const AKESOEDR_PROCESS_EVENT *p = &evt->Payload.Process;
 
     if (p->IsCreate) {
         g_ProcessCreates++;
@@ -148,9 +148,9 @@ PrintProcessEvent(const SENTINEL_EVENT *evt)
 }
 
 static void
-PrintThreadEvent(const SENTINEL_EVENT *evt)
+PrintThreadEvent(const AKESOEDR_EVENT *evt)
 {
-    const SENTINEL_THREAD_EVENT *t = &evt->Payload.Thread;
+    const AKESOEDR_THREAD_EVENT *t = &evt->Payload.Thread;
 
     if (t->IsCreate) {
         g_ThreadCreates++;
@@ -176,9 +176,9 @@ PrintThreadEvent(const SENTINEL_EVENT *evt)
 }
 
 static void
-PrintObjectEvent(const SENTINEL_EVENT *evt)
+PrintObjectEvent(const AKESOEDR_EVENT *evt)
 {
-    const SENTINEL_OBJECT_EVENT *o = &evt->Payload.Object;
+    const AKESOEDR_OBJECT_EVENT *o = &evt->Payload.Object;
 
     g_ObjectEvents++;
 
@@ -197,9 +197,9 @@ PrintObjectEvent(const SENTINEL_EVENT *evt)
 }
 
 static void
-PrintImageLoadEvent(const SENTINEL_EVENT *evt)
+PrintImageLoadEvent(const AKESOEDR_EVENT *evt)
 {
-    const SENTINEL_IMAGELOAD_EVENT *img = &evt->Payload.ImageLoad;
+    const AKESOEDR_IMAGELOAD_EVENT *img = &evt->Payload.ImageLoad;
 
     g_ImageLoadEvents++;
 
@@ -219,7 +219,7 @@ PrintImageLoadEvent(const SENTINEL_EVENT *evt)
 }
 
 static void
-PrintGenericEvent(const SENTINEL_EVENT *evt)
+PrintGenericEvent(const AKESOEDR_EVENT *evt)
 {
     printf("  [?] Unhandled source=%d (%s)\n",
         evt->Source, SourceToString(evt->Source));
@@ -228,7 +228,7 @@ PrintGenericEvent(const SENTINEL_EVENT *evt)
 /* ── Process one event ──────────────────────────────────────────────────── */
 
 static void
-ProcessEvent(const SENTINEL_EVENT *evt)
+ProcessEvent(const AKESOEDR_EVENT *evt)
 {
     char timeBuf[64];
 
@@ -254,16 +254,16 @@ ProcessEvent(const SENTINEL_EVENT *evt)
 
     /* Dispatch to type-specific printer */
     switch (evt->Source) {
-    case SentinelSourceDriverProcess:
+    case AkesoEDRSourceDriverProcess:
         PrintProcessEvent(evt);
         break;
-    case SentinelSourceDriverThread:
+    case AkesoEDRSourceDriverThread:
         PrintThreadEvent(evt);
         break;
-    case SentinelSourceDriverObject:
+    case AkesoEDRSourceDriverObject:
         PrintObjectEvent(evt);
         break;
-    case SentinelSourceDriverImageLoad:
+    case AkesoEDRSourceDriverImageLoad:
         PrintImageLoadEvent(evt);
         break;
     default:
@@ -299,7 +299,7 @@ static void
 PrintStatistics(void)
 {
     printf("\n════════════════════════════════════════════════════════\n");
-    printf("  SentinelEDR Test Consumer — Session Summary\n");
+    printf("  AkesoEDR Test Consumer — Session Summary\n");
     printf("════════════════════════════════════════════════════════\n");
     printf("  Total events received:  %lu\n", g_TotalEvents);
     printf("  Process creates:        %lu\n", g_ProcessCreates);
@@ -322,7 +322,7 @@ int main(int argc, char *argv[])
     CONSUMER_MESSAGE *msgBuf = NULL;
 
     printf("╔══════════════════════════════════════════════════════╗\n");
-    printf("║  SentinelEDR Test Consumer v1.0.0   (P1-T4)        ║\n");
+    printf("║  AkesoEDR Test Consumer v1.0.0   (P1-T4)        ║\n");
     printf("║  Press Ctrl+C to stop                              ║\n");
     printf("╚══════════════════════════════════════════════════════╝\n\n");
 
@@ -352,17 +352,17 @@ int main(int argc, char *argv[])
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 
-    printf("[*] sizeof(SENTINEL_EVENT)       = %zu bytes\n", sizeof(SENTINEL_EVENT));
-    printf("[*] sizeof(SENTINEL_FILTER_MSG)  = %zu bytes\n", sizeof(SENTINEL_FILTER_MSG));
+    printf("[*] sizeof(AKESOEDR_EVENT)       = %zu bytes\n", sizeof(AKESOEDR_EVENT));
+    printf("[*] sizeof(AKESOEDR_FILTER_MSG)  = %zu bytes\n", sizeof(AKESOEDR_FILTER_MSG));
     printf("[*] sizeof(CONSUMER_MESSAGE)     = %zu bytes\n", sizeof(CONSUMER_MESSAGE));
     printf("\n");
 
     /* ── Connect to filter port ───────────────────────────────────────── */
 
-    printf("[*] Connecting to %ls ...\n", SENTINEL_FILTER_PORT_NAME);
+    printf("[*] Connecting to %ls ...\n", AKESOEDR_FILTER_PORT_NAME);
 
     hr = FilterConnectCommunicationPort(
-        SENTINEL_FILTER_PORT_NAME,
+        AKESOEDR_FILTER_PORT_NAME,
         0,                          /* Options */
         NULL,                       /* Context (sent to driver's connect callback) */
         0,                          /* ContextSize */
@@ -374,7 +374,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "[!] FilterConnectCommunicationPort failed: 0x%08lX\n", hr);
 
         if (hr == 0x800704D6) {
-            fprintf(stderr, "    -> The driver is not loaded. Run: sc start sentinel-drv\n");
+            fprintf(stderr, "    -> The driver is not loaded. Run: sc start akesoedr-drv\n");
         } else if (hr == 0x80070005) {
             fprintf(stderr, "    -> Access denied. Run as Administrator.\n");
         } else if (hr == 0x8007001F) {
@@ -391,7 +391,7 @@ int main(int argc, char *argv[])
     /* ── Event receive loop ───────────────────────────────────────────── */
 
     while (g_Running) {
-        SENTINEL_IPC_HEADER *hdr;
+        AKESOEDR_IPC_HEADER *hdr;
 
         ZeroMemory(msgBuf, sizeof(CONSUMER_MESSAGE));
 
@@ -427,21 +427,21 @@ int main(int argc, char *argv[])
         /* Validate IPC header */
         hdr = &msgBuf->Body.Header;
 
-        if (hdr->Magic != SENTINEL_IPC_MAGIC) {
+        if (hdr->Magic != AKESOEDR_IPC_MAGIC) {
             fprintf(stderr, "[!] Bad magic: 0x%08X (expected 0x%08X)\n",
-                hdr->Magic, SENTINEL_IPC_MAGIC);
+                hdr->Magic, AKESOEDR_IPC_MAGIC);
             g_Errors++;
             continue;
         }
 
-        if (hdr->Version != SENTINEL_IPC_VERSION) {
+        if (hdr->Version != AKESOEDR_IPC_VERSION) {
             fprintf(stderr, "[!] Bad version: %u (expected %u)\n",
-                hdr->Version, SENTINEL_IPC_VERSION);
+                hdr->Version, AKESOEDR_IPC_VERSION);
             g_Errors++;
             continue;
         }
 
-        if (hdr->Type != (UINT16)SentinelMsgEvent) {
+        if (hdr->Type != (UINT16)AkesoEDRMsgEvent) {
             fprintf(stderr, "[!] Unexpected message type: %u\n", hdr->Type);
             g_Errors++;
             continue;

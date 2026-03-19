@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Install and start the SentinelEDR kernel driver.
+    Install and start the AkesoEDR kernel driver.
 
 .DESCRIPTION
     1. Verifies the driver binary exists
@@ -11,10 +11,10 @@
     5. Starts the driver service and verifies status
 
 .PARAMETER DriverPath
-    Path to sentinel-drv.sys. Defaults to build\bin\Release\sentinel-drv.sys.
+    Path to akesoedr-drv.sys. Defaults to build\bin\Release\akesoedr-drv.sys.
 
 .PARAMETER ServiceName
-    Name for the driver service. Defaults to SentinelDrv.
+    Name for the driver service. Defaults to AkesoEDRDrv.
 
 .PARAMETER Altitude
     Minifilter altitude. Defaults to 321000 (FSFilter Anti-Virus range).
@@ -25,17 +25,17 @@
 #>
 
 param(
-    [string]$DriverPath = "$PSScriptRoot\..\build\bin\Release\sentinel-drv.sys",
-    [string]$ServiceName = "SentinelDrv",
-    [string]$DisplayName = "SentinelEDR Kernel Driver",
-    [string]$CertSubject = "CN=SentinelEDR Test Signing",
+    [string]$DriverPath = "$PSScriptRoot\..\build\bin\Release\akesoedr-drv.sys",
+    [string]$ServiceName = "AkesoEDRDrv",
+    [string]$DisplayName = "AkesoEDR Kernel Driver",
+    [string]$CertSubject = "CN=AkesoEDR Test Signing",
     [string]$Altitude = "321000",
     [switch]$SkipSign
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== SentinelEDR Driver Install ===" -ForegroundColor Cyan
+Write-Host "=== AkesoEDR Driver Install ===" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Step 1: Verify driver binary ------------------------------------------------

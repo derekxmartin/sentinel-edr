@@ -1,13 +1,13 @@
 /*
  * common/ipc_serialize.h
- * Serialization helpers for SentinelEDR IPC protocol.
+ * Serialization helpers for AkesoEDR IPC protocol.
  *
  * These functions serialize and deserialize IPC messages to/from a byte
  * buffer suitable for transmission over a named pipe or filter port.
  *
  * Wire format:
  *   [UINT32 frame_length]   ← total bytes following this field
- *   [SENTINEL_IPC_HEADER]   ← message header (magic, version, type, etc.)
+ *   [AKESOEDR_IPC_HEADER]   ← message header (magic, version, type, etc.)
  *   [payload bytes]         ← message-type-specific payload
  *
  * All multi-byte integers are little-endian (native x64).
@@ -17,8 +17,8 @@
  * filter port messages, which are memory-copied).
  */
 
-#ifndef SENTINEL_IPC_SERIALIZE_H
-#define SENTINEL_IPC_SERIALIZE_H
+#ifndef AKESOEDR_IPC_SERIALIZE_H
+#define AKESOEDR_IPC_SERIALIZE_H
 
 #include "ipc.h"
 
@@ -30,15 +30,15 @@ extern "C" {
 
 /* ── Error codes ─────────────────────────────────────────────────────────── */
 
-typedef enum _SENTINEL_SERIALIZE_STATUS {
-    SentinelSerializeOk             = 0,
-    SentinelSerializeBufferTooSmall = 1,
-    SentinelSerializeBadMagic       = 2,
-    SentinelSerializeBadVersion     = 3,
-    SentinelSerializeBadLength      = 4,
-    SentinelSerializeBadType        = 5,
-    SentinelSerializeIncomplete     = 6
-} SENTINEL_SERIALIZE_STATUS;
+typedef enum _AKESOEDR_SERIALIZE_STATUS {
+    AkesoEDRSerializeOk             = 0,
+    AkesoEDRSerializeBufferTooSmall = 1,
+    AkesoEDRSerializeBadMagic       = 2,
+    AkesoEDRSerializeBadVersion     = 3,
+    AkesoEDRSerializeBadLength      = 4,
+    AkesoEDRSerializeBadType        = 5,
+    AkesoEDRSerializeIncomplete     = 6
+} AKESOEDR_SERIALIZE_STATUS;
 
 /* ── Header helpers ──────────────────────────────────────────────────────── */
 
@@ -46,41 +46,41 @@ typedef enum _SENTINEL_SERIALIZE_STATUS {
  * Initialize an IPC header with magic, version, type, and payload size.
  */
 static __inline void
-SentinelIpcHeaderInit(
-    SENTINEL_IPC_HEADER*    Header,
-    SENTINEL_IPC_MSG_TYPE   Type,
+AkesoEDRIpcHeaderInit(
+    AKESOEDR_IPC_HEADER*    Header,
+    AKESOEDR_IPC_MSG_TYPE   Type,
     UINT32                  PayloadSize,
     UINT32                  SequenceNum
 )
 {
-    Header->Magic       = SENTINEL_IPC_MAGIC;
-    Header->Version     = SENTINEL_IPC_VERSION;
+    Header->Magic       = AKESOEDR_IPC_MAGIC;
+    Header->Version     = AKESOEDR_IPC_VERSION;
     Header->Type        = (UINT16)Type;
     Header->PayloadSize = PayloadSize;
     Header->SequenceNum = SequenceNum;
 }
 
 /*
- * Validate an IPC header. Returns SentinelSerializeOk on success.
+ * Validate an IPC header. Returns AkesoEDRSerializeOk on success.
  */
-static __inline SENTINEL_SERIALIZE_STATUS
-SentinelIpcHeaderValidate(
-    const SENTINEL_IPC_HEADER*  Header
+static __inline AKESOEDR_SERIALIZE_STATUS
+AkesoEDRIpcHeaderValidate(
+    const AKESOEDR_IPC_HEADER*  Header
 )
 {
-    if (Header->Magic != SENTINEL_IPC_MAGIC)
-        return SentinelSerializeBadMagic;
+    if (Header->Magic != AKESOEDR_IPC_MAGIC)
+        return AkesoEDRSerializeBadMagic;
 
-    if (Header->Version != SENTINEL_IPC_VERSION)
-        return SentinelSerializeBadVersion;
+    if (Header->Version != AKESOEDR_IPC_VERSION)
+        return AkesoEDRSerializeBadVersion;
 
-    if (Header->Type < SentinelMsgHandshake || Header->Type > SentinelMsgHeartbeat)
-        return SentinelSerializeBadType;
+    if (Header->Type < AkesoEDRMsgHandshake || Header->Type > AkesoEDRMsgHeartbeat)
+        return AkesoEDRSerializeBadType;
 
-    if (Header->PayloadSize > SENTINEL_IPC_MAX_PAYLOAD)
-        return SentinelSerializeBadLength;
+    if (Header->PayloadSize > AKESOEDR_IPC_MAX_PAYLOAD)
+        return AkesoEDRSerializeBadLength;
 
-    return SentinelSerializeOk;
+    return AkesoEDRSerializeOk;
 }
 
 /* ── Frame write (serialize to buffer) ───────────────────────────────────── */
@@ -99,11 +99,11 @@ SentinelIpcHeaderValidate(
  *   DataSize    - Size of Data in bytes.
  *   BytesWritten - On success, set to total bytes written (4 + DataSize).
  *
- * Returns SentinelSerializeOk on success, SentinelSerializeBufferTooSmall
+ * Returns AkesoEDRSerializeOk on success, AkesoEDRSerializeBufferTooSmall
  * if the buffer cannot hold the frame.
  */
-static __inline SENTINEL_SERIALIZE_STATUS
-SentinelIpcWriteFrame(
+static __inline AKESOEDR_SERIALIZE_STATUS
+AkesoEDRIpcWriteFrame(
     BYTE*       Buffer,
     UINT32      BufferSize,
     const void* Data,
@@ -115,7 +115,7 @@ SentinelIpcWriteFrame(
 
     if (BufferSize < totalSize) {
         *BytesWritten = 0;
-        return SentinelSerializeBufferTooSmall;
+        return AkesoEDRSerializeBufferTooSmall;
     }
 
     /* Write length prefix (little-endian, native on x64) */
@@ -125,7 +125,7 @@ SentinelIpcWriteFrame(
     memcpy(Buffer + sizeof(UINT32), Data, DataSize);
 
     *BytesWritten = totalSize;
-    return SentinelSerializeOk;
+    return AkesoEDRSerializeOk;
 }
 
 /* ── Frame read (deserialize from buffer) ────────────────────────────────── */
@@ -138,13 +138,13 @@ SentinelIpcWriteFrame(
  *   BufferSize   - Available bytes in Buffer.
  *   FrameLength  - On success, set to the payload length (bytes after prefix).
  *
- * Returns SentinelSerializeOk if a complete length prefix is available and
- * the value is within bounds. Returns SentinelSerializeIncomplete if fewer
- * than 4 bytes are available. Returns SentinelSerializeBadLength if the
- * frame length exceeds SENTINEL_IPC_MAX_PAYLOAD.
+ * Returns AkesoEDRSerializeOk if a complete length prefix is available and
+ * the value is within bounds. Returns AkesoEDRSerializeIncomplete if fewer
+ * than 4 bytes are available. Returns AkesoEDRSerializeBadLength if the
+ * frame length exceeds AKESOEDR_IPC_MAX_PAYLOAD.
  */
-static __inline SENTINEL_SERIALIZE_STATUS
-SentinelIpcReadFrameLength(
+static __inline AKESOEDR_SERIALIZE_STATUS
+AkesoEDRIpcReadFrameLength(
     const BYTE* Buffer,
     UINT32      BufferSize,
     UINT32*     FrameLength
@@ -152,15 +152,15 @@ SentinelIpcReadFrameLength(
 {
     if (BufferSize < sizeof(UINT32)) {
         *FrameLength = 0;
-        return SentinelSerializeIncomplete;
+        return AkesoEDRSerializeIncomplete;
     }
 
     *FrameLength = *(const UINT32*)Buffer;
 
-    if (*FrameLength > SENTINEL_IPC_MAX_PAYLOAD)
-        return SentinelSerializeBadLength;
+    if (*FrameLength > AKESOEDR_IPC_MAX_PAYLOAD)
+        return AkesoEDRSerializeBadLength;
 
-    return SentinelSerializeOk;
+    return AkesoEDRSerializeOk;
 }
 
 /*
@@ -173,10 +173,10 @@ SentinelIpcReadFrameLength(
  *   OutDataSize - Size of OutData buffer.
  *   BytesRead   - On success, total bytes consumed (4 + payload length).
  *
- * Returns SentinelSerializeOk on success.
+ * Returns AkesoEDRSerializeOk on success.
  */
-static __inline SENTINEL_SERIALIZE_STATUS
-SentinelIpcReadFrame(
+static __inline AKESOEDR_SERIALIZE_STATUS
+AkesoEDRIpcReadFrame(
     const BYTE* Buffer,
     UINT32      BufferSize,
     void*       OutData,
@@ -185,10 +185,10 @@ SentinelIpcReadFrame(
 )
 {
     UINT32 frameLength = 0;
-    SENTINEL_SERIALIZE_STATUS status;
+    AKESOEDR_SERIALIZE_STATUS status;
 
-    status = SentinelIpcReadFrameLength(Buffer, BufferSize, &frameLength);
-    if (status != SentinelSerializeOk) {
+    status = AkesoEDRIpcReadFrameLength(Buffer, BufferSize, &frameLength);
+    if (status != AkesoEDRSerializeOk) {
         *BytesRead = 0;
         return status;
     }
@@ -196,18 +196,18 @@ SentinelIpcReadFrame(
     /* Check that the full frame is available in the buffer */
     if (BufferSize < sizeof(UINT32) + frameLength) {
         *BytesRead = 0;
-        return SentinelSerializeIncomplete;
+        return AkesoEDRSerializeIncomplete;
     }
 
     /* Check that the output buffer is large enough */
     if (OutDataSize < frameLength) {
         *BytesRead = 0;
-        return SentinelSerializeBufferTooSmall;
+        return AkesoEDRSerializeBufferTooSmall;
     }
 
     memcpy(OutData, Buffer + sizeof(UINT32), frameLength);
     *BytesRead = sizeof(UINT32) + frameLength;
-    return SentinelSerializeOk;
+    return AkesoEDRSerializeOk;
 }
 
 /* ── Handshake helpers ───────────────────────────────────────────────────── */
@@ -216,18 +216,18 @@ SentinelIpcReadFrame(
  * Build a handshake message ready for framing.
  */
 static __inline void
-SentinelIpcBuildHandshake(
-    SENTINEL_IPC_HANDSHAKE* Msg,
-    SENTINEL_CLIENT_TYPE    ClientType,
+AkesoEDRIpcBuildHandshake(
+    AKESOEDR_IPC_HANDSHAKE* Msg,
+    AKESOEDR_CLIENT_TYPE    ClientType,
     UINT32                  ClientPid,
     UINT32                  SequenceNum
 )
 {
     ZeroMemory(Msg, sizeof(*Msg));
-    SentinelIpcHeaderInit(
+    AkesoEDRIpcHeaderInit(
         &Msg->Header,
-        SentinelMsgHandshake,
-        sizeof(SENTINEL_IPC_HANDSHAKE) - sizeof(SENTINEL_IPC_HEADER),
+        AkesoEDRMsgHandshake,
+        sizeof(AKESOEDR_IPC_HANDSHAKE) - sizeof(AKESOEDR_IPC_HEADER),
         SequenceNum
     );
     Msg->ClientType = (UINT32)ClientType;
@@ -238,18 +238,18 @@ SentinelIpcBuildHandshake(
  * Build a handshake reply message.
  */
 static __inline void
-SentinelIpcBuildHandshakeReply(
-    SENTINEL_IPC_HANDSHAKE_REPLY*   Msg,
-    SENTINEL_HANDSHAKE_STATUS       Status,
+AkesoEDRIpcBuildHandshakeReply(
+    AKESOEDR_IPC_HANDSHAKE_REPLY*   Msg,
+    AKESOEDR_HANDSHAKE_STATUS       Status,
     UINT32                          ServerPid,
     UINT32                          SequenceNum
 )
 {
     ZeroMemory(Msg, sizeof(*Msg));
-    SentinelIpcHeaderInit(
+    AkesoEDRIpcHeaderInit(
         &Msg->Header,
-        SentinelMsgHandshakeReply,
-        sizeof(SENTINEL_IPC_HANDSHAKE_REPLY) - sizeof(SENTINEL_IPC_HEADER),
+        AkesoEDRMsgHandshakeReply,
+        sizeof(AKESOEDR_IPC_HANDSHAKE_REPLY) - sizeof(AKESOEDR_IPC_HEADER),
         SequenceNum
     );
     Msg->Status    = (UINT32)Status;
@@ -261,7 +261,7 @@ SentinelIpcBuildHandshakeReply(
 /*
  * Serialize a single event into a framed buffer.
  *
- * Layout: [UINT32 frame_len] [SENTINEL_IPC_EVENT_MSG] [SENTINEL_EVENT]
+ * Layout: [UINT32 frame_len] [AKESOEDR_IPC_EVENT_MSG] [AKESOEDR_EVENT]
  *
  * Parameters:
  *   Buffer       - Destination buffer.
@@ -270,35 +270,35 @@ SentinelIpcBuildHandshakeReply(
  *   SequenceNum  - Message sequence number.
  *   BytesWritten - Total bytes written to Buffer.
  */
-static __inline SENTINEL_SERIALIZE_STATUS
-SentinelIpcSerializeEvent(
+static __inline AKESOEDR_SERIALIZE_STATUS
+AkesoEDRIpcSerializeEvent(
     BYTE*                   Buffer,
     UINT32                  BufferSize,
-    const SENTINEL_EVENT*   Event,
+    const AKESOEDR_EVENT*   Event,
     UINT32                  SequenceNum,
     UINT32*                 BytesWritten
 )
 {
-    SENTINEL_IPC_EVENT_MSG  msgHeader;
+    AKESOEDR_IPC_EVENT_MSG  msgHeader;
     UINT32                  payloadSize;
     UINT32                  totalMsgSize;
     UINT32                  totalFrameSize;
 
-    payloadSize   = sizeof(SENTINEL_IPC_EVENT_MSG) - sizeof(SENTINEL_IPC_HEADER)
-                  + sizeof(SENTINEL_EVENT);
-    totalMsgSize  = sizeof(SENTINEL_IPC_EVENT_MSG) + sizeof(SENTINEL_EVENT);
+    payloadSize   = sizeof(AKESOEDR_IPC_EVENT_MSG) - sizeof(AKESOEDR_IPC_HEADER)
+                  + sizeof(AKESOEDR_EVENT);
+    totalMsgSize  = sizeof(AKESOEDR_IPC_EVENT_MSG) + sizeof(AKESOEDR_EVENT);
     totalFrameSize = sizeof(UINT32) + totalMsgSize;
 
     if (BufferSize < totalFrameSize) {
         *BytesWritten = 0;
-        return SentinelSerializeBufferTooSmall;
+        return AkesoEDRSerializeBufferTooSmall;
     }
 
     /* Build event message header */
     ZeroMemory(&msgHeader, sizeof(msgHeader));
-    SentinelIpcHeaderInit(
+    AkesoEDRIpcHeaderInit(
         &msgHeader.Header,
-        SentinelMsgEvent,
+        AkesoEDRMsgEvent,
         payloadSize,
         SequenceNum
     );
@@ -311,10 +311,10 @@ SentinelIpcSerializeEvent(
     memcpy(Buffer + sizeof(UINT32), &msgHeader, sizeof(msgHeader));
 
     /* Write event payload */
-    memcpy(Buffer + sizeof(UINT32) + sizeof(msgHeader), Event, sizeof(SENTINEL_EVENT));
+    memcpy(Buffer + sizeof(UINT32) + sizeof(msgHeader), Event, sizeof(AKESOEDR_EVENT));
 
     *BytesWritten = totalFrameSize;
-    return SentinelSerializeOk;
+    return AkesoEDRSerializeOk;
 }
 
 /*
@@ -326,22 +326,22 @@ SentinelIpcSerializeEvent(
  *   OutEvent    - Destination for the deserialized event.
  *   BytesRead   - Total bytes consumed from Buffer.
  */
-static __inline SENTINEL_SERIALIZE_STATUS
-SentinelIpcDeserializeEvent(
+static __inline AKESOEDR_SERIALIZE_STATUS
+AkesoEDRIpcDeserializeEvent(
     const BYTE*         Buffer,
     UINT32              BufferSize,
-    SENTINEL_EVENT*     OutEvent,
+    AKESOEDR_EVENT*     OutEvent,
     UINT32*             BytesRead
 )
 {
     UINT32                  frameLength = 0;
-    SENTINEL_SERIALIZE_STATUS status;
-    const SENTINEL_IPC_EVENT_MSG* msgHeader;
+    AKESOEDR_SERIALIZE_STATUS status;
+    const AKESOEDR_IPC_EVENT_MSG* msgHeader;
     const BYTE*             eventData;
 
     /* Read and validate frame length */
-    status = SentinelIpcReadFrameLength(Buffer, BufferSize, &frameLength);
-    if (status != SentinelSerializeOk) {
+    status = AkesoEDRIpcReadFrameLength(Buffer, BufferSize, &frameLength);
+    if (status != AkesoEDRSerializeOk) {
         *BytesRead = 0;
         return status;
     }
@@ -349,47 +349,47 @@ SentinelIpcDeserializeEvent(
     /* Ensure the full frame is available */
     if (BufferSize < sizeof(UINT32) + frameLength) {
         *BytesRead = 0;
-        return SentinelSerializeIncomplete;
+        return AkesoEDRSerializeIncomplete;
     }
 
     /* Validate minimum size for event message header */
-    if (frameLength < sizeof(SENTINEL_IPC_EVENT_MSG)) {
+    if (frameLength < sizeof(AKESOEDR_IPC_EVENT_MSG)) {
         *BytesRead = 0;
-        return SentinelSerializeBadLength;
+        return AkesoEDRSerializeBadLength;
     }
 
     /* Parse event message header */
-    msgHeader = (const SENTINEL_IPC_EVENT_MSG*)(Buffer + sizeof(UINT32));
+    msgHeader = (const AKESOEDR_IPC_EVENT_MSG*)(Buffer + sizeof(UINT32));
 
     /* Validate IPC header */
-    status = SentinelIpcHeaderValidate(&msgHeader->Header);
-    if (status != SentinelSerializeOk) {
+    status = AkesoEDRIpcHeaderValidate(&msgHeader->Header);
+    if (status != AkesoEDRSerializeOk) {
         *BytesRead = 0;
         return status;
     }
 
-    if (msgHeader->Header.Type != SentinelMsgEvent) {
+    if (msgHeader->Header.Type != AkesoEDRMsgEvent) {
         *BytesRead = 0;
-        return SentinelSerializeBadType;
+        return AkesoEDRSerializeBadType;
     }
 
     if (msgHeader->EventCount < 1) {
         *BytesRead = 0;
-        return SentinelSerializeBadLength;
+        return AkesoEDRSerializeBadLength;
     }
 
     /* Ensure there's enough data for at least one event */
-    if (frameLength < sizeof(SENTINEL_IPC_EVENT_MSG) + sizeof(SENTINEL_EVENT)) {
+    if (frameLength < sizeof(AKESOEDR_IPC_EVENT_MSG) + sizeof(AKESOEDR_EVENT)) {
         *BytesRead = 0;
-        return SentinelSerializeBadLength;
+        return AkesoEDRSerializeBadLength;
     }
 
     /* Copy event out */
-    eventData = Buffer + sizeof(UINT32) + sizeof(SENTINEL_IPC_EVENT_MSG);
-    memcpy(OutEvent, eventData, sizeof(SENTINEL_EVENT));
+    eventData = Buffer + sizeof(UINT32) + sizeof(AKESOEDR_IPC_EVENT_MSG);
+    memcpy(OutEvent, eventData, sizeof(AKESOEDR_EVENT));
 
     *BytesRead = sizeof(UINT32) + frameLength;
-    return SentinelSerializeOk;
+    return AkesoEDRSerializeOk;
 }
 
 #ifdef __cplusplus
@@ -398,4 +398,4 @@ SentinelIpcDeserializeEvent(
 
 #endif /* _KERNEL_MODE */
 
-#endif /* SENTINEL_IPC_SERIALIZE_H */
+#endif /* AKESOEDR_IPC_SERIALIZE_H */

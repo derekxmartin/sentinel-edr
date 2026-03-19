@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Enable test-signing mode for SentinelEDR driver development.
+    Enable test-signing mode for AkesoEDR driver development.
 
 .DESCRIPTION
     Configures the system for loading test-signed kernel drivers:
@@ -18,14 +18,14 @@
 #>
 
 param(
-    [string]$CertSubject = "CN=SentinelEDR Test Signing",
+    [string]$CertSubject = "CN=AkesoEDR Test Signing",
     [string]$CertStoreLocation = "Cert:\CurrentUser\My",
     [string]$OutputDir = "$PSScriptRoot\..\certs"
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== SentinelEDR Test-Signing Setup ===" -ForegroundColor Cyan
+Write-Host "=== AkesoEDR Test-Signing Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Step 1: Enable test-signing --------------------------------------------------
@@ -58,7 +58,7 @@ if ($existingCert) {
         -Type CodeSigningCert `
         -CertStoreLocation $CertStoreLocation `
         -NotAfter (Get-Date).AddYears(5) `
-        -FriendlyName "SentinelEDR Driver Test Signing"
+        -FriendlyName "AkesoEDR Driver Test Signing"
 
     Write-Host "  Created certificate: $($cert.Thumbprint)" -ForegroundColor Green
 }
@@ -71,7 +71,7 @@ if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
-$certPath = Join-Path $OutputDir "SentinelEDR-TestSign.cer"
+$certPath = Join-Path $OutputDir "AkesoEDR-TestSign.cer"
 Export-Certificate -Cert $cert -FilePath $certPath -Force | Out-Null
 Write-Host "  Exported to: $certPath" -ForegroundColor Green
 
@@ -96,7 +96,7 @@ Write-Host "Certificate thumbprint: $($cert.Thumbprint)"
 Write-Host "Certificate file:       $certPath"
 Write-Host ""
 Write-Host "To sign the driver after building:" -ForegroundColor Yellow
-Write-Host "  signtool sign /v /s My /n `"$CertSubject`" /t http://timestamp.digicert.com sentinel-drv.sys"
+Write-Host "  signtool sign /v /s My /n `"$CertSubject`" /t http://timestamp.digicert.com akesoedr-drv.sys"
 Write-Host ""
 
 $restartNeeded = -not ($currentMode -match "Yes")

@@ -12,14 +12,14 @@
  *   - MITRE ATT&CK S0002 (Mimikatz)
  *   - MITRE ATT&CK T1003.001 (LSASS Memory)
  *
- * SentinelEDR Phase 5, Task 4.
+ * AkesoEDR Phase 5, Task 4.
  */
 
 rule Mimikatz_Binary
 {
     meta:
         description = "Mimikatz binary (standard or modified build)"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Critical"
         mitre       = "S0002"
         phase       = "P5-T4"
@@ -68,7 +68,7 @@ rule Mimikatz_PowerShell
 {
     meta:
         description = "PowerShell-based Mimikatz (Invoke-Mimikatz)"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Critical"
         mitre       = "S0002"
         phase       = "P5-T4"
@@ -101,7 +101,7 @@ rule Mimikatz_Driver_Mimidrv
 {
     meta:
         description = "Mimikatz kernel driver (mimidrv.sys)"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Critical"
         mitre       = "S0002"
         phase       = "P5-T4"

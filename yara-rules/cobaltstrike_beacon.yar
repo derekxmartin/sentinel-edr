@@ -10,16 +10,16 @@
  * References:
  *   - https://www.cobaltstrike.com/
  *   - MITRE ATT&CK S0154 (Cobalt Strike)
- *   - SentinelOne CobaltStrike research
+ *   - AkesoEDROne CobaltStrike research
  *
- * SentinelEDR Phase 5, Task 4.
+ * AkesoEDR Phase 5, Task 4.
  */
 
 rule CobaltStrike_Beacon_Config
 {
     meta:
         description = "Cobalt Strike beacon configuration block"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Critical"
         mitre       = "S0154"
         phase       = "P5-T4"
@@ -66,7 +66,7 @@ rule CobaltStrike_Shellcode_Stager
 {
     meta:
         description = "Cobalt Strike shellcode stager (reflective loader)"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Critical"
         mitre       = "S0154"
         phase       = "P5-T4"
@@ -121,7 +121,7 @@ rule CobaltStrike_Default_Pipe_Names
 {
     meta:
         description = "Binary containing Cobalt Strike default pipe name patterns"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "High"
         mitre       = "S0154"
         phase       = "P5-T4"

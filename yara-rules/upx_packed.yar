@@ -12,7 +12,7 @@
  *   - https://upx.github.io/
  *   - MITRE ATT&CK T1027.002 (Software Packing)
  *
- * SentinelEDR Phase 5, Task 4.
+ * AkesoEDR Phase 5, Task 4.
  */
 
 import "pe"
@@ -21,7 +21,7 @@ rule UPX_Packed_Standard
 {
     meta:
         description = "PE packed with standard UPX (unmodified headers)"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Low"
         mitre       = "T1027.002"
         phase       = "P5-T4"
@@ -49,7 +49,7 @@ rule UPX_Packed_Modified
 {
     meta:
         description = "PE packed with UPX but section names modified to evade detection"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Medium"
         mitre       = "T1027.002"
         phase       = "P5-T4"

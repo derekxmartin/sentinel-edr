@@ -71,6 +71,6 @@ int main()
     VirtualFree(mem, 0, MEM_RELEASE);
 
     LOG("[shellcode_test] Done. Sequence alert should appear in agent output.\n");
-    LOG("[shellcode_test] Check C:\\SentinelEDR\\agent_events.jsonl for the alert.\n");
+    LOG("[shellcode_test] Check C:\\AkesoEDR\\agent_events.jsonl for the alert.\n");
     return 0;
 }

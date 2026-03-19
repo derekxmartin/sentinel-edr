@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(SentinelEDR VERSION 1.0.0 LANGUAGES C CXX)
+project(AkesoEDR VERSION 1.0.0 LANGUAGES C CXX)
 
 # ── Global settings ──────────────────────────────────────────────────────────
 set(CMAKE_C_STANDARD 17)
@@ -36,16 +36,16 @@ add_subdirectory(deps/yara)
 
 # Kernel-mode driver (requires WDK)
 if(WDK_FOUND)
-    add_subdirectory(sentinel-drv)
+    add_subdirectory(akesoedr-drv)
 else()
-    message(STATUS "Skipping sentinel-drv (no WDK)")
+    message(STATUS "Skipping akesoedr-drv (no WDK)")
 endif()
 
 # User-mode components (always built)
-add_subdirectory(sentinel-hook)
-add_subdirectory(sentinel-agent)
-add_subdirectory(sentinel-cli)
-add_subdirectory(sentinel-amsi)
+add_subdirectory(akesoedr-hook)
+add_subdirectory(akesoedr-agent)
+add_subdirectory(akesoedr-cli)
+add_subdirectory(akesoedr-amsi)
 
 # Tests
 enable_testing()

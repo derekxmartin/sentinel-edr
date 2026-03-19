@@ -1,4 +1,4 @@
-# SentinelEDR — Requirements Document v1.0
+# AkesoEDR — Requirements Document v1.0
 
 **A Proof-of-Concept Endpoint Detection & Response Agent for Windows x64**
 
@@ -12,11 +12,11 @@ Version 1.0 — Initial Requirements + Implementation Phases | March 2026
 
 ## 1. Executive Summary
 
-SentinelEDR is a proof-of-concept Endpoint Detection and Response (EDR) agent for 64-bit Windows, built entirely in C/C++. Its purpose is to serve as a purple-team training platform: a fully transparent, open-architecture EDR whose internals can be studied, attacked, and improved upon by both offensive and defensive security practitioners.
+AkesoEDR is a proof-of-concept Endpoint Detection and Response (EDR) agent for 64-bit Windows, built entirely in C/C++. Its purpose is to serve as a purple-team training platform: a fully transparent, open-architecture EDR whose internals can be studied, attacked, and improved upon by both offensive and defensive security practitioners.
 
-The project's design is directly informed by the sensor architecture described in Matt Hand's *Evading EDR* (No Starch Press, 2023). Each sensor component the book deconstructs—from kernel callback routines and userland function hooks to ETW consumers, minifilters, and AMSI providers—becomes a discrete, testable module within SentinelEDR. The Chapter 13 case study (a full detection-aware attack chain from initial access through exfiltration) serves as the primary integration test plan.
+The project's design is directly informed by the sensor architecture described in Matt Hand's *Evading EDR* (No Starch Press, 2023). Each sensor component the book deconstructs—from kernel callback routines and userland function hooks to ETW consumers, minifilters, and AMSI providers—becomes a discrete, testable module within AkesoEDR. The Chapter 13 case study (a full detection-aware attack chain from initial access through exfiltration) serves as the primary integration test plan.
 
-This document is organized into two parts. Part I captures the system requirements: what SentinelEDR must do, how its components are structured, and the acceptance criteria for each sensor. Part II breaks the implementation into phased tasks sized for iterative development with Claude Code.
+This document is organized into two parts. Part I captures the system requirements: what AkesoEDR must do, how its components are structured, and the acceptance criteria for each sensor. Part II breaks the implementation into phased tasks sized for iterative development with Claude Code.
 
 ## 2. Project Goals & Non-Goals
 
@@ -31,7 +31,7 @@ This document is organized into two parts. Part I captures the system requiremen
 
 ### 2.2 Non-Goals (v1)
 
-- Production deployment or commercial use. SentinelEDR is a research and training tool.
+- Production deployment or commercial use. AkesoEDR is a research and training tool.
 - WHQL driver signing or ELAM certification (test-signing mode is acceptable for v1).
 - Cloud-based backend analytics, machine learning, or global reputation scoring.
 - Cross-platform support (Linux/macOS agents are out of scope).
@@ -46,14 +46,14 @@ The architecture follows the "Intermediate" agent design from Chapter 1, with ho
 
 | Component | Mode | Responsibility |
 |-----------|------|----------------|
-| **sentinel-drv** `.sys` | Kernel | Registers all kernel callback routines (process, thread, object, image-load, registry), minifilter for filesystem I/O, WFP callout for network filtering. Communicates telemetry to agent via filter communication port. |
-| **sentinel-hook** `.dll` | User (injected) | Function-hooking DLL injected into monitored processes via KAPC injection. Hooks ntdll exports using inline trampoline hooks. |
-| **sentinel-agent** `.exe` | User (service) | Central agent service. Aggregates telemetry from driver, hooking DLL, ETW consumers, and scanner. Runs detection rule engine. Emits alerts to log sink. Manages AMSI provider registration. |
-| **sentinel-cli** `.exe` | User (console) | Management CLI for querying agent status, reviewing alerts, triggering scans, loading rules, and pulling signature updates from Git. |
+| **akesoedr-drv** `.sys` | Kernel | Registers all kernel callback routines (process, thread, object, image-load, registry), minifilter for filesystem I/O, WFP callout for network filtering. Communicates telemetry to agent via filter communication port. |
+| **akesoedr-hook** `.dll` | User (injected) | Function-hooking DLL injected into monitored processes via KAPC injection. Hooks ntdll exports using inline trampoline hooks. |
+| **akesoedr-agent** `.exe` | User (service) | Central agent service. Aggregates telemetry from driver, hooking DLL, ETW consumers, and scanner. Runs detection rule engine. Emits alerts to log sink. Manages AMSI provider registration. |
+| **akesoedr-cli** `.exe` | User (console) | Management CLI for querying agent status, reviewing alerts, triggering scans, loading rules, and pulling signature updates from Git. |
 
 ### 3.2 Telemetry Protocol
 
-All sensor components emit telemetry as JSON-structured events over a named pipe (`\\.\pipe\SentinelTelemetry`). Each event includes a common envelope: **event_id** (UUID v4), **timestamp** (high-resolution), **source** (sensor identifier), **process_context** (PID, PPID, image path, command line, user SID, session ID, integrity level), and **payload** (sensor-specific data).
+All sensor components emit telemetry as JSON-structured events over a named pipe (`\\.\pipe\AkesoEDRTelemetry`). Each event includes a common envelope: **event_id** (UUID v4), **timestamp** (high-resolution), **source** (sensor identifier), **process_context** (PID, PPID, image path, command line, user SID, session ID, integrity level), and **payload** (sensor-specific data).
 
 ### 3.3 Detection Engine
 
@@ -61,7 +61,7 @@ The agent implements a rule-based detection engine inspired by the Elastic detec
 
 ### 3.4 Signature Updates
 
-Detection rules (YAML) and YARA signatures are stored in Git repositories. `sentinel-cli rules update` pulls latest rules, validates YAML/YARA, and triggers hot-reload. Validation failure rolls back the pull automatically.
+Detection rules (YAML) and YARA signatures are stored in Git repositories. `akesoedr-cli rules update` pulls latest rules, validates YAML/YARA, and triggers hot-reload. Validation failure rolls back the pull automatically.
 
 ## 4. Sensor Component Requirements
 
@@ -93,7 +93,7 @@ Detection rules (YAML) and YARA signatures are stored in Git repositories. `sent
 | **Telemetry** | Image: path, base address, size, signing status, PID. Registry: operation type, key path, value name, data. |
 | **Detection targets** | Unsigned DLLs in sensitive processes. Persistence registry keys. Preview handler registration (Ch. 13). |
 | **Test evasions** | Tunneling tools. Callback entry overwrites via vulnerable driver. |
-| **KAPC injection** | Image-load triggers injection of sentinel-hook.dll via kernel APC queuing. |
+| **KAPC injection** | Image-load triggers injection of akesoedr-hook.dll via kernel APC queuing. |
 
 ### 4.2 Filesystem Minifilter Driver (Chapter 6)
 
@@ -212,7 +212,7 @@ Detection rules (YAML) and YARA signatures are stored in Git repositories. `sent
 
 ### 7.3 Repository Structure
 
-`sentinel-drv/` (kernel driver) · `sentinel-hook/` (hooking DLL) · `sentinel-agent/` (agent service) · `sentinel-cli/` (CLI) · `common/` (shared headers) · `rules/` (YAML, Git-managed) · `yara-rules/` (YARA, Git-managed) · `tests/` (integration tests) · `scripts/` (build/install helpers) · `docs/` (architecture + API docs)
+`akesoedr-drv/` (kernel driver) · `akesoedr-hook/` (hooking DLL) · `akesoedr-agent/` (agent service) · `akesoedr-cli/` (CLI) · `common/` (shared headers) · `rules/` (YAML, Git-managed) · `yara-rules/` (YARA, Git-managed) · `tests/` (integration tests) · `scripts/` (build/install helpers) · `docs/` (architecture + API docs)
 
 ## 8. Risks & Mitigations
 
@@ -284,7 +284,7 @@ Part II breaks Part I's requirements into 49 discrete tasks across 12 phases, ea
 
 | ID | Task | Files | Acceptance Criteria | Est. |
 |----|------|-------|-------------------|------|
-| P1-T1 | DriverEntry/Unload, device object, filter communication port. | `sentinel-drv/main.c`, `comms.c`, `comms.h` | Load/unload clean. Port visible to user-mode. | M |
+| P1-T1 | DriverEntry/Unload, device object, filter communication port. | `akesoedr-drv/main.c`, `comms.c`, `comms.h` | Load/unload clean. Port visible to user-mode. | M |
 | P1-T2 | Process creation callback (PsSetCreateProcessNotifyRoutineEx). Full event: image, cmdline, PID, PPID, token, PE metadata. | `callbacks_process.c/.h` | notepad.exe → event on port. All fields non-null. <50ms. | L |
 | P1-T3 | Thread creation callback. Remote thread flagging. | `callbacks_thread.c/.h` | Process + thread events. CreateRemoteThread → remote=true. | M |
 | P1-T4 | Test consumer: connect to filter port, print JSON to stdout. | `tests/test_consumer.c` | JSON stream on process launch. Clean disconnect. | M |
@@ -299,7 +299,7 @@ Part II breaks Part I's requirements into 49 discrete tasks across 12 phases, ea
 |----|------|-------|-------------------|------|
 | P2-T1 | Object callbacks (ObRegisterCallbacks). Protected process list. | `callbacks_object.c/.h` | lsass handle open → event. Non-protected filtered. | L |
 | P2-T2 | Image-load callback. Signing status. Per-process module table. | `callbacks_imageload.c/.h`, `process_table.c` | DLL load → event with path + sig status. Unsigned flagged. | L |
-| P2-T3 | KAPC injection on ntdll load. Resolve LdrLoadDll, queue APC to load sentinel-hook.dll. Exclusion list. | `kapc_inject.c/.h` | New process has sentinel-hook.dll loaded. Excluded processes skipped. | XL |
+| P2-T3 | KAPC injection on ntdll load. Resolve LdrLoadDll, queue APC to load akesoedr-hook.dll. Exclusion list. | `kapc_inject.c/.h` | New process has akesoedr-hook.dll loaded. Excluded processes skipped. | XL |
 | P2-T4 | Registry callback (CmRegisterCallbackEx). Noise filtering. | `callbacks_registry.c/.h` | Run key → event. Explorer chatter filtered. No perf hit. | L |
 
 ---
@@ -352,7 +352,7 @@ Part II breaks Part I's requirements into 49 discrete tasks across 12 phases, ea
 |----|------|-------|-------------------|------|
 | P6-T1 | WFP callout registration. Outbound + inbound ALE layers. | `wfp_callout.c/.h` | Registered in netsh. No network disruption. | L |
 | P6-T2 | Classify callback: IP/port/protocol/PID/direction. Rate limit 100/s per PID. | `wfp_classify.c` | Browser → events. Rate limiting works. | M |
-| P6-T3 | Agent connection table: PID, remote IP/port, counts, timestamps. CLI exposure. | `network_table.cpp/.h` | `sentinel-cli connections` shows correct table. | M |
+| P6-T3 | Agent connection table: PID, remote IP/port, counts, timestamps. CLI exposure. | `network_table.cpp/.h` | `akesoedr-cli connections` shows correct table. | M |
 
 ---
 
@@ -387,11 +387,11 @@ Part II breaks Part I's requirements into 49 discrete tasks across 12 phases, ea
 
 | ID | Task | Files | Acceptance Criteria | Est. |
 |----|------|-------|-------------------|------|
-| P9-T1 | Core CLI: status, alerts, scan, rules reload. Command pipe. | `sentinel-cli/main.cpp`, `commands/*.cpp`, `sentinel-agent/cmd_handler.cpp` | All subcommands work. rules reload picks up new YAML. | M |
+| P9-T1 | Core CLI: status, alerts, scan, rules reload. Command pipe. | `akesoedr-cli/main.cpp`, `commands/*.cpp`, `akesoedr-agent/cmd_handler.cpp` | All subcommands work. rules reload picks up new YAML. | M |
 | P9-T2 | Inspection: connections, processes, hooks. --json flag. | `commands/connections/processes/hooks.cpp` | Correct data. JSON output works. | M |
-| P9-T3 | Config file (TOML/INI). Sensor flags, exclusions, repo URLs. | `config.cpp/.h`, `sentinel.conf` | Disabled sensor → no telemetry. Repo URLs parse. | M |
+| P9-T3 | Config file (TOML/INI). Sensor flags, exclusions, repo URLs. | `config.cpp/.h`, `akesoedr.conf` | Disabled sensor → no telemetry. Repo URLs parse. | M |
 | P9-T4 | `rules update`: git pull + validate + hot-reload. Rollback on failure. --init for clone. | `commands/rules_update.cpp`, `rules/rule_validator.cpp` | New rule → active <10s. Bad rule → rollback. --init clones. | M |
-| P9-T5 | SIEM output writer. HTTP POST client for NDJSON batches to configurable endpoint. API key auth via `X-API-Key` header. Batch accumulation with size + time flush triggers. Spill-to-disk on SIEM unavailability. Drain on reconnect. Config in `[output.siem]` section. JSON serializer converts `SENTINEL_EVENT` to SentinelSIEM Appendix A envelope format. | `sentinel-agent/output/siem_writer.cpp`, `sentinel-agent/output/siem_writer.h`, `sentinel-agent/output/siem_serializer.cpp` | `enabled = true` → events arrive at SIEM endpoint as valid NDJSON. `enabled = false` → no HTTP calls. SIEM down → events spill to disk, no data loss. SIEM back → spill drains. Batch of 100 events sends as single POST. Invalid API key → logged error, events spilled. | L |
+| P9-T5 | SIEM output writer. HTTP POST client for NDJSON batches to configurable endpoint. API key auth via `X-API-Key` header. Batch accumulation with size + time flush triggers. Spill-to-disk on SIEM unavailability. Drain on reconnect. Config in `[output.siem]` section. JSON serializer converts `AKESOEDR_EVENT` to AkesoEDRSIEM Appendix A envelope format. | `akesoedr-agent/output/siem_writer.cpp`, `akesoedr-agent/output/siem_writer.h`, `akesoedr-agent/output/siem_serializer.cpp` | `enabled = true` → events arrive at SIEM endpoint as valid NDJSON. `enabled = false` → no HTTP calls. SIEM down → events spill to disk, no data loss. SIEM back → spill drains. Batch of 100 events sends as single POST. Invalid API key → logged error, events spilled. | L |
  
 
 ---
@@ -415,11 +415,11 @@ Part II breaks Part I's requirements into 49 discrete tasks across 12 phases, ea
 
 | ID | Task | Files | Acceptance Criteria | Est. |
 |----|------|-------|-------------------|------|
-| P11-T1 | Direct syscall + ntdll remap detection. Return address validation. | `sentinel-hook/evasion_detect.c` | SysWhispers → alert. ntdll remap → alert. | L |
-| P11-T2 | Hook integrity monitoring (5s interval). Re-install on removal. | `sentinel-hook/hook_integrity.c` | Overwrite → tamper alert. Hooks restored <5s. | M |
-| P11-T3 | Kernel callback tamper detection. ETW trace session monitoring. | `sentinel-drv/self_protect.c/.h` | Callback removal → alert. Trace stop → alert. | XL |
-| P11-T4 | AMSI bypass detection. AmsiScanBuffer integrity check. | `sentinel-agent/amsi/amsi_integrity.cpp` | Standard bypass → tamper alert. | M |
-| P11-T5 | Telemetry cross-validation (driver vs. ETW Kernel-Process). | `sentinel-agent/crossvalidation.cpp` | Simulated callback disable → cross-val alert. | M |
+| P11-T1 | Direct syscall + ntdll remap detection. Return address validation. | `akesoedr-hook/evasion_detect.c` | SysWhispers → alert. ntdll remap → alert. | L |
+| P11-T2 | Hook integrity monitoring (5s interval). Re-install on removal. | `akesoedr-hook/hook_integrity.c` | Overwrite → tamper alert. Hooks restored <5s. | M |
+| P11-T3 | Kernel callback tamper detection. ETW trace session monitoring. | `akesoedr-drv/self_protect.c/.h` | Callback removal → alert. Trace stop → alert. | XL |
+| P11-T4 | AMSI bypass detection. AmsiScanBuffer integrity check. | `akesoedr-agent/amsi/amsi_integrity.cpp` | Standard bypass → tamper alert. | M |
+| P11-T5 | Telemetry cross-validation (driver vs. ETW Kernel-Process). | `akesoedr-agent/crossvalidation.cpp` | Simulated callback disable → cross-val alert. | M |
 
 ---
 
@@ -446,11 +446,11 @@ Part II breaks Part I's requirements into 49 discrete tasks across 12 phases, ea
 
 ## Code Conventions & Constraints
 
-### Kernel-Mode (sentinel-drv)
+### Kernel-Mode (akesoedr-drv)
 - C17. No C++, no STL, no exceptions. Pool tag `'SnPc'`. `ExAllocatePool2`. Document IRQL. Check every NTSTATUS. Clean DriverUnload. Pass Driver Verifier.
 
-### User-Mode (sentinel-hook, sentinel-agent, sentinel-cli)
-- sentinel-hook: C17, minimal CRT. sentinel-agent: C++20/MSVC. sentinel-cli: C++20, no Boost.
+### User-Mode (akesoedr-hook, akesoedr-agent, akesoedr-cli)
+- akesoedr-hook: C17, minimal CRT. akesoedr-agent: C++20/MSVC. akesoedr-cli: C++20, no Boost.
 - No external network calls (local-only v1). Thread pool for async. Overlapped pipe I/O. JSON logging.
 
 ### Detection Rules (YAML)
@@ -462,7 +462,7 @@ Part II breaks Part I's requirements into 49 discrete tasks across 12 phases, ea
 
 v1 is intentionally local-only. v2 introduces remote management (install on test machine, monitor from admin workstation).
 
-### sentinel-server (new, admin machine)
+### akesoedr-server (new, admin machine)
 - TLS listener for agent connections. SQLite storage (or ELK/Splunk forwarding). REST API for alerts/telemetry/connections. Agent enrollment + heartbeat. Optional web dashboard.
 
 ### Agent/CLI Changes
@@ -474,7 +474,7 @@ v1 is intentionally local-only. v2 introduces remote management (install on test
 - Server in C++ (same toolchain). TLS only. Multi-agent. No cloud deps. Single binary.
 
 ### v1 Prep for v2
-- `SENTINEL_EVENT` + `common/ipc` serialization → TLS is just a new sink. Length-prefixed framing → maps to TCP. CLI transport layer is abstract. Pipeline decouples ingestion from output.
+- `AKESOEDR_EVENT` + `common/ipc` serialization → TLS is just a new sink. Length-prefixed framing → maps to TCP. CLI transport layer is abstract. Pipeline decouples ingestion from output.
 
 ### Other v2+ Candidates
 - ELAM + EtwTi (Ch. 11–12, requires MS cert)

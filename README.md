@@ -1,7 +1,7 @@
-# SentinelEDR
+# AkesoEDR
 
 <p align="center">
-  <img src="docs/logo.jpg" alt="SentinelEDR Logo" width="400">
+  <img src="docs/logo.jpg" alt="AkesoEDR Logo" width="400">
 </p>
 
 A proof-of-concept Endpoint Detection & Response (EDR) agent for Windows x64, built from the ground up with kernel-mode telemetry, user-mode API hooking, YARA scanning, and a multi-layer detection engine.
@@ -38,13 +38,13 @@ Traditional antivirus relies on static file signatures — it can only catch wha
 
 ### Why Build One?
 
-Understanding how an EDR works at the implementation level — kernel callbacks, inline hooks, filter drivers, ETW plumbing — is the fastest way to understand both what defenders can see and what attackers try to evade. SentinelEDR exists for exactly this purpose: a fully transparent, source-available EDR that security practitioners can study, modify, and experiment with.
+Understanding how an EDR works at the implementation level — kernel callbacks, inline hooks, filter drivers, ETW plumbing — is the fastest way to understand both what defenders can see and what attackers try to evade. AkesoEDR exists for exactly this purpose: a fully transparent, source-available EDR that security practitioners can study, modify, and experiment with.
 
 ---
 
 ## What It Does
 
-SentinelEDR instruments a Windows system at every layer — kernel callbacks, inline API hooks, ETW tracing, AMSI integration, and file system filtering — to collect security telemetry and detect adversary techniques in real time.
+AkesoEDR instruments a Windows system at every layer — kernel callbacks, inline API hooks, ETW tracing, AMSI integration, and file system filtering — to collect security telemetry and detect adversary techniques in real time.
 
 **Highlights:**
 
@@ -71,7 +71,7 @@ SentinelEDR instruments a Windows system at every layer — kernel callbacks, in
 ┌─────────────────────────────────────────────────────────────────┐
 │                        KERNEL MODE                              │
 │                                                                 │
-│  sentinel-drv.sys                                               │
+│  akesoedr-drv.sys                                               │
 │  ├── Process/Thread callbacks ─────┐                            │
 │  ├── Object callbacks (LSASS       │                            │
 │  │   protection)                   │   Filter Communication     │
@@ -85,9 +85,9 @@ SentinelEDR instruments a Windows system at every layer — kernel callbacks, in
 ┌─────────────────────────────────────────────────────────│───────┐
 │                        USER MODE                        │       │
 │                                                         ▼       │
-│  sentinel-agent.exe                                             │
+│  akesoedr-agent.exe                                             │
 │  ├── Driver Port Receiver ◄────────────────────────────┘        │
-│  ├── Pipe Server ◄──────────── sentinel-hook.dll (per-process)  │
+│  ├── Pipe Server ◄──────────── akesoedr-hook.dll (per-process)  │
 │  ├── ETW Consumer ◄─────────── 8 system providers               │
 │  ├── AMSI Provider ◄────────── PowerShell / script hosts        │
 │  │                                                              │
@@ -101,8 +101,8 @@ SentinelEDR instruments a Windows system at every layer — kernel callbacks, in
 │  │                    ├── JSON log writer (auto-rotate)          │
 │  │                    └── SIEM output writer ──► HTTP POST ──► SIEM │
 │  │                                                              │
-│  ├── Command Handler ◄──────── sentinel-cli.exe (named pipe)    │
-│  └── Config Loader ◄──────── sentinel.conf (INI-style)          │
+│  ├── Command Handler ◄──────── akesoedr-cli.exe (named pipe)    │
+│  └── Config Loader ◄──────── akesoedr.conf (INI-style)          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -112,18 +112,18 @@ SentinelEDR instruments a Windows system at every layer — kernel callbacks, in
 
 | Component | Language | Description |
 |-----------|----------|-------------|
-| **sentinel-drv** | C17 (WDK) | Kernel-mode WDM driver with 8 callback types, minifilter, WFP callout, and KAPC injection |
-| **sentinel-hook** | C17 | User-mode hooking DLL injected via kernel APC. Inline hooks on 13 ntdll/kernel32 functions |
-| **sentinel-agent** | C++20 | Windows service: event aggregation, rule engines, ETW consumer, AMSI provider, YARA scanner, config loader |
-| **sentinel-amsi** | C++20 | AMSI provider DLL registered with Windows for script content scanning |
-| **sentinel-cli** | C++20 | Console management tool: status, alerts, scanning, process/connection inspection, config queries |
+| **akesoedr-drv** | C17 (WDK) | Kernel-mode WDM driver with 8 callback types, minifilter, WFP callout, and KAPC injection |
+| **akesoedr-hook** | C17 | User-mode hooking DLL injected via kernel APC. Inline hooks on 13 ntdll/kernel32 functions |
+| **akesoedr-agent** | C++20 | Windows service: event aggregation, rule engines, ETW consumer, AMSI provider, YARA scanner, config loader |
+| **akesoedr-amsi** | C++20 | AMSI provider DLL registered with Windows for script content scanning |
+| **akesoedr-cli** | C++20 | Console management tool: status, alerts, scanning, process/connection inspection, config queries |
 
 ---
 
 ## CLI Commands
 
 ```
-sentinel-cli <command> [args] [--json]
+akesoedr-cli <command> [args] [--json]
 ```
 
 | Command | Description |
@@ -147,10 +147,10 @@ The `rules update` command provides a safe, one-command workflow for deploying s
 
 ```powershell
 # First-time setup: clone rule repositories
-sentinel-cli rules update --init --rules-repo https://github.com/org/rules.git --yara-repo https://github.com/org/yara-rules.git
+akesoedr-cli rules update --init --rules-repo https://github.com/org/rules.git --yara-repo https://github.com/org/yara-rules.git
 
 # Subsequent updates: pull, validate, reload
-sentinel-cli rules update
+akesoedr-cli rules update
 ```
 
 The update process:
@@ -167,16 +167,16 @@ YARA files using unsupported modules (e.g., `cuckoo`, `androguard`) are automati
 
 ## Configuration
 
-The agent reads an INI-style config file at startup. Default location: `C:\SentinelEDR\sentinel.conf`. Override with `--config <path>`.
+The agent reads an INI-style config file at startup. Default location: `C:\AkesoEDR\akesoedr.conf`. Override with `--config <path>`.
 
 Missing keys or a missing file gracefully fall back to compiled-in defaults.
 
 ```ini
 [paths]
-log_path        = C:\SentinelEDR\agent_events.jsonl
-amsi_dll        = C:\SentinelEDR\sentinel-amsi.dll
-rules_dir       = C:\SentinelEDR\rules
-yara_rules_dir  = C:\SentinelEDR\yara-rules
+log_path        = C:\AkesoEDR\agent_events.jsonl
+amsi_dll        = C:\AkesoEDR\akesoedr-amsi.dll
+rules_dir       = C:\AkesoEDR\rules
+yara_rules_dir  = C:\AkesoEDR\yara-rules
 
 [scanner]
 max_file_size_mb   = 50      # Max file size for on-access YARA scan
@@ -190,8 +190,8 @@ max_log_size_mb = 100        # Log rotation threshold
 max_events_per_sec = 100     # Per-PID network event rate limit
 
 [git]
-# rules_repo_url = https://github.com/org/sentinel-rules.git
-# yara_rules_repo_url = https://github.com/org/sentinel-yara-rules.git
+# rules_repo_url = https://github.com/org/akesoedr-rules.git
+# yara_rules_repo_url = https://github.com/org/akesoedr-yara-rules.git
 
 [output.siem]
 enabled             = false
@@ -213,7 +213,7 @@ The agent can forward all telemetry to a SIEM endpoint (Splunk HEC, Elastic, or 
 - **Auto-drain** — when the SIEM comes back online, the spill file is automatically drained before new events are sent
 - **Appendix A envelope** — each event is wrapped with `schema`, `host`, `agent_id`, and `timestamp` for multi-host correlation
 
-Query the running agent's active config with `sentinel-cli config`.
+Query the running agent's active config with `akesoedr-cli config`.
 
 ---
 
@@ -288,14 +288,14 @@ cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-If WDK is not installed, `sentinel-drv` is skipped automatically. All other components build normally.
+If WDK is not installed, `akesoedr-drv` is skipped automatically. All other components build normally.
 
 Output binaries land in `build/bin/Release/`:
-- `sentinel-agent.exe` — the main agent service
-- `sentinel-cli.exe` — management CLI
-- `sentinel-drv.sys` — kernel driver (requires WDK)
-- `sentinel-hook.dll` — hooking DLL (injected by driver)
-- `sentinel-amsi.dll` — AMSI provider (registered by agent)
+- `akesoedr-agent.exe` — the main agent service
+- `akesoedr-cli.exe` — management CLI
+- `akesoedr-drv.sys` — kernel driver (requires WDK)
+- `akesoedr-hook.dll` — hooking DLL (injected by driver)
+- `akesoedr-amsi.dll` — AMSI provider (registered by agent)
 
 ### Test Signing (required for driver deployment)
 
@@ -317,33 +317,33 @@ Output binaries land in `build/bin/Release/`:
 
 ```powershell
 # Create the deployment directory
-New-Item -ItemType Directory -Force -Path C:\SentinelEDR
+New-Item -ItemType Directory -Force -Path C:\AkesoEDR
 
 # Copy binaries
-Copy-Item build\bin\Release\sentinel-agent.exe C:\SentinelEDR\
-Copy-Item build\bin\Release\sentinel-cli.exe   C:\SentinelEDR\
-Copy-Item build\bin\Release\sentinel-hook.dll   C:\SentinelEDR\
-Copy-Item build\bin\Release\sentinel-amsi.dll   C:\SentinelEDR\
+Copy-Item build\bin\Release\akesoedr-agent.exe C:\AkesoEDR\
+Copy-Item build\bin\Release\akesoedr-cli.exe   C:\AkesoEDR\
+Copy-Item build\bin\Release\akesoedr-hook.dll   C:\AkesoEDR\
+Copy-Item build\bin\Release\akesoedr-amsi.dll   C:\AkesoEDR\
 
 # Copy configuration
-Copy-Item sentinel.conf                         C:\SentinelEDR\
+Copy-Item akesoedr.conf                         C:\AkesoEDR\
 
 # Copy rules
-Copy-Item -Recurse rules\       C:\SentinelEDR\rules\
-Copy-Item -Recurse yara-rules\  C:\SentinelEDR\yara-rules\
+Copy-Item -Recurse rules\       C:\AkesoEDR\rules\
+Copy-Item -Recurse yara-rules\  C:\AkesoEDR\yara-rules\
 ```
 
 ### 2. Install and start the kernel driver
 
 ```powershell
 # Copy the signed driver
-Copy-Item build\bin\Release\sentinel-drv.sys C:\SentinelEDR\
+Copy-Item build\bin\Release\akesoedr-drv.sys C:\AkesoEDR\
 
 # Create the driver service
-sc.exe create SentinelDrv type=kernel binPath="C:\SentinelEDR\sentinel-drv.sys"
+sc.exe create AkesoEDRDrv type=kernel binPath="C:\AkesoEDR\akesoedr-drv.sys"
 
 # Start the driver
-sc.exe start SentinelDrv
+sc.exe start AkesoEDRDrv
 ```
 
 ### 3. Run the agent
@@ -352,17 +352,17 @@ sc.exe start SentinelDrv
 
 ```powershell
 # Run from an elevated command prompt
-C:\SentinelEDR\sentinel-agent.exe --console
+C:\AkesoEDR\akesoedr-agent.exe --console
 ```
 
 With a custom config file:
 
 ```powershell
-C:\SentinelEDR\sentinel-agent.exe --console --config C:\SentinelEDR\sentinel.conf
+C:\AkesoEDR\akesoedr-agent.exe --console --config C:\AkesoEDR\akesoedr.conf
 ```
 
 The agent will:
-1. Load configuration from `sentinel.conf` (or use defaults)
+1. Load configuration from `akesoedr.conf` (or use defaults)
 2. Load YAML detection rules from the configured rules directory
 3. Compile YARA rules from the configured YARA rules directory
 4. Connect to the kernel driver's filter communication port
@@ -376,8 +376,8 @@ Press **Ctrl+C** to stop cleanly.
 **Service mode** (for persistent deployment):
 
 ```powershell
-sc.exe create SentinelAgent binPath="C:\SentinelEDR\sentinel-agent.exe" start=auto
-sc.exe start SentinelAgent
+sc.exe create AkesoEDRAgent binPath="C:\AkesoEDR\akesoedr-agent.exe" start=auto
+sc.exe start AkesoEDRAgent
 ```
 
 ### 4. Verify operation
@@ -386,19 +386,19 @@ With the agent running, open a second terminal:
 
 ```powershell
 # Check agent health
-C:\SentinelEDR\sentinel-cli.exe status
+C:\AkesoEDR\akesoedr-cli.exe status
 
 # View active configuration
-C:\SentinelEDR\sentinel-cli.exe config
+C:\AkesoEDR\akesoedr-cli.exe config
 
 # List tracked processes
-C:\SentinelEDR\sentinel-cli.exe processes
+C:\AkesoEDR\akesoedr-cli.exe processes
 
 # View network connections
-C:\SentinelEDR\sentinel-cli.exe connections
+C:\AkesoEDR\akesoedr-cli.exe connections
 
 # Check recent alerts
-C:\SentinelEDR\sentinel-cli.exe alerts
+C:\AkesoEDR\akesoedr-cli.exe alerts
 ```
 
 ---
@@ -427,13 +427,13 @@ The minifilter detects the file creation, computes a SHA-256 hash, and the on-ac
 ```
 claude-edr/
 ├── CMakeLists.txt              Top-level build configuration
-├── sentinel.conf               Default agent configuration file
+├── akesoedr.conf               Default agent configuration file
 ├── common/                     Shared headers
-│   ├── telemetry.h            Event schema (SENTINEL_EVENT union)
+│   ├── telemetry.h            Event schema (AKESOEDR_EVENT union)
 │   ├── constants.h            System-wide constants
 │   ├── ipc.h                  Named pipe protocol + command types
 │   └── ipc_serialize.h        Binary serialization helpers
-├── sentinel-drv/              Kernel-mode driver
+├── akesoedr-drv/              Kernel-mode driver
 │   ├── main.c                 DriverEntry, cleanup, unload
 │   ├── callbacks_process.c    PsSetCreateProcessNotifyRoutineEx
 │   ├── callbacks_thread.c     PsSetCreateThreadNotifyRoutineEx
@@ -445,18 +445,18 @@ claude-edr/
 │   ├── wfp_callout.c          WFP network callout
 │   ├── kapc_inject.c          Kernel APC DLL injection
 │   └── file_hash.c            SHA-256 file hashing
-├── sentinel-hook/             User-mode hooking DLL
+├── akesoedr-hook/             User-mode hooking DLL
 │   ├── main.c                 DllMain, hook installation
 │   ├── hook_engine.c          Inline hook framework
 │   ├── hooks_memory.c         Memory operation hooks
 │   ├── hooks_thread.c         Thread operation hooks
 │   ├── hooks_process.c        Process operation hooks
 │   └── pipe_client.c          Named pipe telemetry sender
-├── sentinel-agent/            Agent service
+├── akesoedr-agent/            Agent service
 │   ├── main.cpp               Entry point (--console, --config)
 │   ├── service.cpp            SCM handler + console mode
 │   ├── config.cpp             INI config parser + serializer
-│   ├── config.h               SentinelConfig struct + API
+│   ├── config.h               AkesoEDRConfig struct + API
 │   ├── pipeline.cpp           Event queue + receiver threads
 │   ├── event_processor.cpp    Event routing + enrichment
 │   ├── cmd_handler.cpp        CLI command dispatch (9 commands)
@@ -479,8 +479,8 @@ claude-edr/
 │   │   └── etw_consumer.cpp   ETW trace session + 8 providers
 │   └── amsi/
 │       └── amsi_provider.cpp  Custom AMSI COM provider
-├── sentinel-amsi/             AMSI provider DLL host
-├── sentinel-cli/              CLI management tool
+├── akesoedr-amsi/             AMSI provider DLL host
+├── akesoedr-cli/              CLI management tool
 │   └── main.cpp               9 commands + git operations + pretty-printers
 ├── yara-rules/                YARA detection rules (14 rules)
 ├── rules/                     YAML behavioral rules (5 rules)

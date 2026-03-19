@@ -1,6 +1,6 @@
 /*
  * tests/test_ipc_roundtrip.c
- * Unit test: serialize a SENTINEL_EVENT, deserialize it, verify round-trip.
+ * Unit test: serialize a AKESOEDR_EVENT, deserialize it, verify round-trip.
  *
  * Build: compiled as part of the tests/ CMake target.
  * Run:   test_ipc_roundtrip.exe — exits 0 on success, 1 on failure.
@@ -35,32 +35,32 @@ static int g_tests_passed = 0;
 
 static int test_header_init_validate(void)
 {
-    SENTINEL_IPC_HEADER hdr;
-    SENTINEL_SERIALIZE_STATUS status;
+    AKESOEDR_IPC_HEADER hdr;
+    AKESOEDR_SERIALIZE_STATUS status;
 
     printf("[test_header_init_validate]\n");
 
-    SentinelIpcHeaderInit(&hdr, SentinelMsgEvent, 1234, 42);
+    AkesoEDRIpcHeaderInit(&hdr, AkesoEDRMsgEvent, 1234, 42);
 
-    TEST_ASSERT(hdr.Magic == SENTINEL_IPC_MAGIC,    "magic matches");
-    TEST_ASSERT(hdr.Version == SENTINEL_IPC_VERSION, "version matches");
-    TEST_ASSERT(hdr.Type == SentinelMsgEvent,       "type matches");
+    TEST_ASSERT(hdr.Magic == AKESOEDR_IPC_MAGIC,    "magic matches");
+    TEST_ASSERT(hdr.Version == AKESOEDR_IPC_VERSION, "version matches");
+    TEST_ASSERT(hdr.Type == AkesoEDRMsgEvent,       "type matches");
     TEST_ASSERT(hdr.PayloadSize == 1234,            "payload size matches");
     TEST_ASSERT(hdr.SequenceNum == 42,              "sequence num matches");
 
-    status = SentinelIpcHeaderValidate(&hdr);
-    TEST_ASSERT(status == SentinelSerializeOk, "header validates ok");
+    status = AkesoEDRIpcHeaderValidate(&hdr);
+    TEST_ASSERT(status == AkesoEDRSerializeOk, "header validates ok");
 
     /* Bad magic */
     hdr.Magic = 0xDEADBEEF;
-    status = SentinelIpcHeaderValidate(&hdr);
-    TEST_ASSERT(status == SentinelSerializeBadMagic, "bad magic detected");
+    status = AkesoEDRIpcHeaderValidate(&hdr);
+    TEST_ASSERT(status == AkesoEDRSerializeBadMagic, "bad magic detected");
 
     /* Restore and test bad version */
-    hdr.Magic = SENTINEL_IPC_MAGIC;
+    hdr.Magic = AKESOEDR_IPC_MAGIC;
     hdr.Version = 999;
-    status = SentinelIpcHeaderValidate(&hdr);
-    TEST_ASSERT(status == SentinelSerializeBadVersion, "bad version detected");
+    status = AkesoEDRIpcHeaderValidate(&hdr);
+    TEST_ASSERT(status == AkesoEDRSerializeBadVersion, "bad version detected");
 
     printf("  OK\n");
     return 0;
@@ -75,31 +75,31 @@ static int test_frame_write_read(void)
     BYTE out[256];
     UINT32 bytesWritten = 0;
     UINT32 bytesRead = 0;
-    SENTINEL_SERIALIZE_STATUS status;
+    AKESOEDR_SERIALIZE_STATUS status;
 
     printf("[test_frame_write_read]\n");
 
     /* Write a simple frame */
-    status = SentinelIpcWriteFrame(buffer, sizeof(buffer), payload, sizeof(payload), &bytesWritten);
-    TEST_ASSERT(status == SentinelSerializeOk, "write frame succeeds");
+    status = AkesoEDRIpcWriteFrame(buffer, sizeof(buffer), payload, sizeof(payload), &bytesWritten);
+    TEST_ASSERT(status == AkesoEDRSerializeOk, "write frame succeeds");
     TEST_ASSERT(bytesWritten == sizeof(UINT32) + sizeof(payload), "correct bytes written");
 
     /* Verify length prefix */
     TEST_ASSERT(*(UINT32*)buffer == sizeof(payload), "length prefix correct");
 
     /* Read it back */
-    status = SentinelIpcReadFrame(buffer, bytesWritten, out, sizeof(out), &bytesRead);
-    TEST_ASSERT(status == SentinelSerializeOk, "read frame succeeds");
+    status = AkesoEDRIpcReadFrame(buffer, bytesWritten, out, sizeof(out), &bytesRead);
+    TEST_ASSERT(status == AkesoEDRSerializeOk, "read frame succeeds");
     TEST_ASSERT(bytesRead == bytesWritten, "same bytes read as written");
     TEST_ASSERT(memcmp(out, payload, sizeof(payload)) == 0, "payload round-trips");
 
     /* Test buffer too small */
-    status = SentinelIpcWriteFrame(buffer, 2, payload, sizeof(payload), &bytesWritten);
-    TEST_ASSERT(status == SentinelSerializeBufferTooSmall, "buffer too small detected");
+    status = AkesoEDRIpcWriteFrame(buffer, 2, payload, sizeof(payload), &bytesWritten);
+    TEST_ASSERT(status == AkesoEDRSerializeBufferTooSmall, "buffer too small detected");
 
     /* Test incomplete read */
-    status = SentinelIpcReadFrame(buffer, 2, out, sizeof(out), &bytesRead);
-    TEST_ASSERT(status == SentinelSerializeIncomplete, "incomplete frame detected");
+    status = AkesoEDRIpcReadFrame(buffer, 2, out, sizeof(out), &bytesRead);
+    TEST_ASSERT(status == AkesoEDRSerializeIncomplete, "incomplete frame detected");
 
     printf("  OK\n");
     return 0;
@@ -109,26 +109,26 @@ static int test_frame_write_read(void)
 
 static int test_handshake(void)
 {
-    SENTINEL_IPC_HANDSHAKE hs;
-    SENTINEL_IPC_HANDSHAKE_REPLY reply;
-    SENTINEL_SERIALIZE_STATUS status;
+    AKESOEDR_IPC_HANDSHAKE hs;
+    AKESOEDR_IPC_HANDSHAKE_REPLY reply;
+    AKESOEDR_SERIALIZE_STATUS status;
 
     printf("[test_handshake]\n");
 
-    SentinelIpcBuildHandshake(&hs, SentinelClientHookDll, 1234, 0);
+    AkesoEDRIpcBuildHandshake(&hs, AkesoEDRClientHookDll, 1234, 0);
 
-    TEST_ASSERT(hs.Header.Magic == SENTINEL_IPC_MAGIC, "handshake magic");
-    TEST_ASSERT(hs.Header.Type == SentinelMsgHandshake, "handshake type");
-    TEST_ASSERT(hs.ClientType == (UINT32)SentinelClientHookDll, "client type");
+    TEST_ASSERT(hs.Header.Magic == AKESOEDR_IPC_MAGIC, "handshake magic");
+    TEST_ASSERT(hs.Header.Type == AkesoEDRMsgHandshake, "handshake type");
+    TEST_ASSERT(hs.ClientType == (UINT32)AkesoEDRClientHookDll, "client type");
     TEST_ASSERT(hs.ClientPid == 1234, "client PID");
 
-    status = SentinelIpcHeaderValidate(&hs.Header);
-    TEST_ASSERT(status == SentinelSerializeOk, "handshake header valid");
+    status = AkesoEDRIpcHeaderValidate(&hs.Header);
+    TEST_ASSERT(status == AkesoEDRSerializeOk, "handshake header valid");
 
-    SentinelIpcBuildHandshakeReply(&reply, SentinelHandshakeOk, 5678, 0);
+    AkesoEDRIpcBuildHandshakeReply(&reply, AkesoEDRHandshakeOk, 5678, 0);
 
-    TEST_ASSERT(reply.Header.Type == SentinelMsgHandshakeReply, "reply type");
-    TEST_ASSERT(reply.Status == (UINT32)SentinelHandshakeOk, "reply status");
+    TEST_ASSERT(reply.Header.Type == AkesoEDRMsgHandshakeReply, "reply type");
+    TEST_ASSERT(reply.Status == (UINT32)AkesoEDRHandshakeOk, "reply status");
     TEST_ASSERT(reply.ServerPid == 5678, "server PID");
 
     printf("  OK\n");
@@ -139,17 +139,17 @@ static int test_handshake(void)
 
 static int test_event_roundtrip(void)
 {
-    SENTINEL_EVENT          original;
-    SENTINEL_EVENT          restored;
+    AKESOEDR_EVENT          original;
+    AKESOEDR_EVENT          restored;
     BYTE                    buffer[64 * 1024];
     UINT32                  bytesWritten = 0;
     UINT32                  bytesRead = 0;
-    SENTINEL_SERIALIZE_STATUS status;
+    AKESOEDR_SERIALIZE_STATUS status;
 
     printf("[test_event_roundtrip]\n");
 
     /* Build a process-create event */
-    SentinelEventInit(&original, SentinelSourceDriverProcess, SentinelSeverityMedium);
+    AkesoEDREventInit(&original, AkesoEDRSourceDriverProcess, AkesoEDRSeverityMedium);
 
     original.ProcessCtx.ProcessId       = 4444;
     original.ProcessCtx.ParentProcessId = 1111;
@@ -157,11 +157,11 @@ static int test_event_roundtrip(void)
     original.ProcessCtx.SessionId       = 1;
     original.ProcessCtx.IntegrityLevel  = 0x2000;   /* SECURITY_MANDATORY_MEDIUM_RID */
     original.ProcessCtx.IsElevated      = FALSE;
-    wcscpy_s(original.ProcessCtx.ImagePath, SENTINEL_MAX_PATH,
+    wcscpy_s(original.ProcessCtx.ImagePath, AKESOEDR_MAX_PATH,
              L"C:\\Windows\\System32\\notepad.exe");
-    wcscpy_s(original.ProcessCtx.CommandLine, SENTINEL_MAX_CMDLINE,
+    wcscpy_s(original.ProcessCtx.CommandLine, AKESOEDR_MAX_CMDLINE,
              L"notepad.exe C:\\test.txt");
-    wcscpy_s(original.ProcessCtx.UserSid, SENTINEL_MAX_SID_STRING,
+    wcscpy_s(original.ProcessCtx.UserSid, AKESOEDR_MAX_SID_STRING,
              L"S-1-5-21-123456789-1-1000");
 
     original.Payload.Process.IsCreate         = TRUE;
@@ -171,25 +171,25 @@ static int test_event_roundtrip(void)
     original.Payload.Process.IntegrityLevel   = 0x2000;
     original.Payload.Process.IsElevated       = FALSE;
     original.Payload.Process.ExitStatus       = 0;
-    wcscpy_s(original.Payload.Process.ImagePath, SENTINEL_MAX_PATH,
+    wcscpy_s(original.Payload.Process.ImagePath, AKESOEDR_MAX_PATH,
              L"C:\\Windows\\System32\\notepad.exe");
-    wcscpy_s(original.Payload.Process.CommandLine, SENTINEL_MAX_CMDLINE,
+    wcscpy_s(original.Payload.Process.CommandLine, AKESOEDR_MAX_CMDLINE,
              L"notepad.exe C:\\test.txt");
-    wcscpy_s(original.Payload.Process.UserSid, SENTINEL_MAX_SID_STRING,
+    wcscpy_s(original.Payload.Process.UserSid, AKESOEDR_MAX_SID_STRING,
              L"S-1-5-21-123456789-1-1000");
 
     /* Serialize */
-    status = SentinelIpcSerializeEvent(buffer, sizeof(buffer), &original, 1, &bytesWritten);
-    TEST_ASSERT(status == SentinelSerializeOk, "serialize succeeds");
+    status = AkesoEDRIpcSerializeEvent(buffer, sizeof(buffer), &original, 1, &bytesWritten);
+    TEST_ASSERT(status == AkesoEDRSerializeOk, "serialize succeeds");
     TEST_ASSERT(bytesWritten > 0, "bytes written > 0");
 
     printf("  Serialized event: %u bytes (frame overhead: %u bytes)\n",
-           bytesWritten, (UINT32)(bytesWritten - sizeof(SENTINEL_EVENT)));
+           bytesWritten, (UINT32)(bytesWritten - sizeof(AKESOEDR_EVENT)));
 
     /* Deserialize */
     ZeroMemory(&restored, sizeof(restored));
-    status = SentinelIpcDeserializeEvent(buffer, bytesWritten, &restored, &bytesRead);
-    TEST_ASSERT(status == SentinelSerializeOk, "deserialize succeeds");
+    status = AkesoEDRIpcDeserializeEvent(buffer, bytesWritten, &restored, &bytesRead);
+    TEST_ASSERT(status == AkesoEDRSerializeOk, "deserialize succeeds");
     TEST_ASSERT(bytesRead == bytesWritten, "consumed all bytes");
 
     /* Verify envelope fields */
@@ -231,7 +231,7 @@ static int test_event_roundtrip(void)
                 "process payload image path round-trips");
 
     /* Verify full binary equality */
-    TEST_ASSERT(memcmp(&original, &restored, sizeof(SENTINEL_EVENT)) == 0,
+    TEST_ASSERT(memcmp(&original, &restored, sizeof(AKESOEDR_EVENT)) == 0,
                 "full struct binary equality");
 
     printf("  OK\n");
@@ -242,17 +242,17 @@ static int test_event_roundtrip(void)
 
 static int test_event_buffer_too_small(void)
 {
-    SENTINEL_EVENT event;
+    AKESOEDR_EVENT event;
     BYTE tiny[64];
     UINT32 bytesWritten = 0;
-    SENTINEL_SERIALIZE_STATUS status;
+    AKESOEDR_SERIALIZE_STATUS status;
 
     printf("[test_event_buffer_too_small]\n");
 
-    SentinelEventInit(&event, SentinelSourceDriverProcess, SentinelSeverityLow);
+    AkesoEDREventInit(&event, AkesoEDRSourceDriverProcess, AkesoEDRSeverityLow);
 
-    status = SentinelIpcSerializeEvent(tiny, sizeof(tiny), &event, 0, &bytesWritten);
-    TEST_ASSERT(status == SentinelSerializeBufferTooSmall, "tiny buffer rejected");
+    status = AkesoEDRIpcSerializeEvent(tiny, sizeof(tiny), &event, 0, &bytesWritten);
+    TEST_ASSERT(status == AkesoEDRSerializeBufferTooSmall, "tiny buffer rejected");
     TEST_ASSERT(bytesWritten == 0, "no bytes written on failure");
 
     printf("  OK\n");
@@ -265,7 +265,7 @@ int main(void)
 {
     int failed = 0;
 
-    printf("=== SentinelEDR IPC Round-Trip Tests ===\n\n");
+    printf("=== AkesoEDR IPC Round-Trip Tests ===\n\n");
 
     failed += test_header_init_validate();
     failed += test_frame_write_read();

@@ -11,7 +11,7 @@
  *   - MITRE ATT&CK T1137.006 (Office Add-ins)
  *   - https://www.mandiant.com/resources/xll-files
  *
- * SentinelEDR Phase 5, Task 4.
+ * AkesoEDR Phase 5, Task 4.
  */
 
 import "pe"
@@ -20,7 +20,7 @@ rule XLL_With_Shellcode_Stager
 {
     meta:
         description = "XLL add-in with shellcode stager patterns"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "High"
         mitre       = "T1137.006"
         phase       = "P5-T4"
@@ -64,7 +64,7 @@ rule XLL_Suspicious_Imports
 {
     meta:
         description = "XLL add-in with suspicious import combination"
-        author      = "SentinelEDR"
+        author      = "AkesoEDR"
         severity    = "Medium"
         mitre       = "T1137.006"
         phase       = "P5-T4"

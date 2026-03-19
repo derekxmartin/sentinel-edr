@@ -1,0 +1,4 @@
+LIBRARY akesoedr-amsi
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE

@@ -18,7 +18,7 @@
  * counters every second.
  *
  * Book reference: Chapter 7 — Network Filter Drivers.
- * SentinelPOC Phase 6, Task 1.
+ * SentinelEDR Phase 6, Task 1.
  */
 
 #include <fltKernel.h>
@@ -414,7 +414,7 @@ SentinelWfpInit(
     PAGED_CODE();
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: WFP init starting\n"));
+        "SentinelEDR: WFP init starting\n"));
 
     /* ── Step 1: Open BFE engine session ──────────────────────────────── */
 
@@ -427,7 +427,7 @@ SentinelWfpInit(
     );
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmEngineOpen0 failed 0x%08X\n", status));
+            "SentinelEDR: FwpmEngineOpen0 failed 0x%08X\n", status));
         return status;
     }
 
@@ -436,7 +436,7 @@ SentinelWfpInit(
     status = FwpmTransactionBegin0(s_EngineHandle, 0);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmTransactionBegin0 failed 0x%08X\n", status));
+            "SentinelEDR: FwpmTransactionBegin0 failed 0x%08X\n", status));
         goto cleanup_engine;
     }
 
@@ -450,11 +450,11 @@ SentinelWfpInit(
     status = FwpsCalloutRegister0(DeviceObject, &sCallout, &s_ConnectCalloutId);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpsCalloutRegister0 (connect) failed 0x%08X\n", status));
+            "SentinelEDR: FwpsCalloutRegister0 (connect) failed 0x%08X\n", status));
         goto abort_txn;
     }
 
-    displayData.name        = L"SentinelPOC ALE Connect v4";
+    displayData.name        = L"SentinelEDR ALE Connect v4";
     displayData.description = L"Monitors outbound IPv4 connections";
 
     mCallout.calloutKey       = SENTINEL_WFP_CALLOUT_CONNECT_V4;
@@ -464,7 +464,7 @@ SentinelWfpInit(
     status = FwpmCalloutAdd0(s_EngineHandle, &mCallout, NULL, NULL);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmCalloutAdd0 (connect) failed 0x%08X\n", status));
+            "SentinelEDR: FwpmCalloutAdd0 (connect) failed 0x%08X\n", status));
         goto abort_txn;
     }
 
@@ -479,11 +479,11 @@ SentinelWfpInit(
     status = FwpsCalloutRegister0(DeviceObject, &sCallout, &s_RecvCalloutId);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpsCalloutRegister0 (recv) failed 0x%08X\n", status));
+            "SentinelEDR: FwpsCalloutRegister0 (recv) failed 0x%08X\n", status));
         goto abort_txn;
     }
 
-    displayData.name        = L"SentinelPOC ALE Recv/Accept v4";
+    displayData.name        = L"SentinelEDR ALE Recv/Accept v4";
     displayData.description = L"Monitors inbound IPv4 connections";
 
     RtlZeroMemory(&mCallout, sizeof(mCallout));
@@ -494,15 +494,15 @@ SentinelWfpInit(
     status = FwpmCalloutAdd0(s_EngineHandle, &mCallout, NULL, NULL);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmCalloutAdd0 (recv) failed 0x%08X\n", status));
+            "SentinelEDR: FwpmCalloutAdd0 (recv) failed 0x%08X\n", status));
         goto abort_txn;
     }
 
     /* ── Step 5: Add sublayer ─────────────────────────────────────────── */
 
     subLayer.subLayerKey         = SENTINEL_WFP_SUBLAYER_GUID;
-    displayData.name             = L"SentinelPOC Sublayer";
-    displayData.description      = L"SentinelPOC network inspection sublayer";
+    displayData.name             = L"SentinelEDR Sublayer";
+    displayData.description      = L"SentinelEDR network inspection sublayer";
     subLayer.displayData         = displayData;
     subLayer.flags               = 0;
     subLayer.weight              = 0x8000;  /* Mid-range weight */
@@ -510,7 +510,7 @@ SentinelWfpInit(
     status = FwpmSubLayerAdd0(s_EngineHandle, &subLayer, NULL);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmSubLayerAdd0 failed 0x%08X\n", status));
+            "SentinelEDR: FwpmSubLayerAdd0 failed 0x%08X\n", status));
         goto abort_txn;
     }
 
@@ -518,7 +518,7 @@ SentinelWfpInit(
 
     RtlZeroMemory(&filter, sizeof(filter));
     filter.filterKey            = SENTINEL_WFP_FILTER_CONNECT_V4;
-    displayData.name            = L"SentinelPOC Connect Filter v4";
+    displayData.name            = L"SentinelEDR Connect Filter v4";
     displayData.description     = L"Inspection filter for outbound IPv4";
     filter.displayData          = displayData;
     filter.layerKey             = FWPM_LAYER_ALE_AUTH_CONNECT_V4;
@@ -531,7 +531,7 @@ SentinelWfpInit(
     status = FwpmFilterAdd0(s_EngineHandle, &filter, NULL, &filterId);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmFilterAdd0 (connect) failed 0x%08X\n", status));
+            "SentinelEDR: FwpmFilterAdd0 (connect) failed 0x%08X\n", status));
         goto abort_txn;
     }
 
@@ -539,7 +539,7 @@ SentinelWfpInit(
 
     RtlZeroMemory(&filter, sizeof(filter));
     filter.filterKey            = SENTINEL_WFP_FILTER_RECV_V4;
-    displayData.name            = L"SentinelPOC Recv Filter v4";
+    displayData.name            = L"SentinelEDR Recv Filter v4";
     displayData.description     = L"Inspection filter for inbound IPv4";
     filter.displayData          = displayData;
     filter.layerKey             = FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4;
@@ -552,7 +552,7 @@ SentinelWfpInit(
     status = FwpmFilterAdd0(s_EngineHandle, &filter, NULL, &filterId);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmFilterAdd0 (recv) failed 0x%08X\n", status));
+            "SentinelEDR: FwpmFilterAdd0 (recv) failed 0x%08X\n", status));
         goto abort_txn;
     }
 
@@ -561,7 +561,7 @@ SentinelWfpInit(
     status = FwpmTransactionCommit0(s_EngineHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FwpmTransactionCommit0 failed 0x%08X\n", status));
+            "SentinelEDR: FwpmTransactionCommit0 failed 0x%08X\n", status));
         goto cleanup_engine;
     }
 
@@ -587,7 +587,7 @@ SentinelWfpInit(
     s_Initialized = TRUE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: WFP callouts registered (connect=%u, recv=%u)\n",
+        "SentinelEDR: WFP callouts registered (connect=%u, recv=%u)\n",
         s_ConnectCalloutId, s_RecvCalloutId));
 
     return STATUS_SUCCESS;
@@ -635,7 +635,7 @@ SentinelWfpStop(void)
     s_Initialized = FALSE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: WFP cleanup starting\n"));
+        "SentinelEDR: WFP cleanup starting\n"));
 
     /* Stop rate-limit timer */
     if (s_TimerInitialized) {
@@ -693,5 +693,5 @@ SentinelWfpStop(void)
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: WFP cleanup complete\n"));
+        "SentinelEDR: WFP cleanup complete\n"));
 }

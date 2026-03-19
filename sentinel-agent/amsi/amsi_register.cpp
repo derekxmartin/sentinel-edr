@@ -105,7 +105,7 @@ AmsiProviderRegister(const WCHAR* dllPath)
     }
 
     /* Set display name */
-    const WCHAR displayName[] = L"SentinelPOC AMSI Provider";
+    const WCHAR displayName[] = L"SentinelEDR AMSI Provider";
     RegSetValueExW(hClsidKey, nullptr, 0, REG_SZ,
         (const BYTE*)displayName, sizeof(displayName));
 

@@ -21,7 +21,7 @@ static void WriteHex(HANDLE hFile, const char* label, ULONG_PTR val) {
 
 int main()
 {
-    HANDLE hLog = CreateFileA("C:\\SentinelPOC\\hook_test_result.txt",
+    HANDLE hLog = CreateFileA("C:\\SentinelEDR\\hook_test_result.txt",
         GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
         FILE_ATTRIBUTE_NORMAL, NULL);
 

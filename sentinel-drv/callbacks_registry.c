@@ -123,14 +123,14 @@ SentinelRegistryCallbackInit(
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: CmRegisterCallbackEx failed 0x%08X\n", status));
+            "SentinelEDR: CmRegisterCallbackEx failed 0x%08X\n", status));
         return status;
     }
 
     g_RegistryCallbackRegistered = TRUE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Registry callback registered (altitude %wZ)\n",
+        "SentinelEDR: Registry callback registered (altitude %wZ)\n",
         &altitude));
 
     return STATUS_SUCCESS;
@@ -152,7 +152,7 @@ SentinelRegistryCallbackStop(VOID)
     g_RegistryCallbackRegistered = FALSE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Registry callback unregistered\n"));
+        "SentinelEDR: Registry callback unregistered\n"));
 }
 
 /* ── Noise filter ──────────────────────────────────────────────────────── */
@@ -438,7 +438,7 @@ SentinelEmitRegistryEvent(
         }
 
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-            "SentinelPOC: Registry op=%d PID=%lu key=%wZ\n",
+            "SentinelEDR: Registry op=%d PID=%lu key=%wZ\n",
             (int)Operation,
             (ULONG)(ULONG_PTR)pid,
             KeyPath));
@@ -447,7 +447,7 @@ SentinelEmitRegistryEvent(
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in registry callback PID=%lu\n",
+            "SentinelEDR: Exception 0x%08X in registry callback PID=%lu\n",
             GetExceptionCode(),
             (ULONG)(ULONG_PTR)pid));
     }

@@ -74,7 +74,7 @@ SentinelCommsInit(
     status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FltBuildDefaultSecurityDescriptor failed 0x%08X\n", status));
+            "SentinelEDR: FltBuildDefaultSecurityDescriptor failed 0x%08X\n", status));
         return status;
     }
 
@@ -107,12 +107,12 @@ SentinelCommsInit(
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FltCreateCommunicationPort failed 0x%08X\n", status));
+            "SentinelEDR: FltCreateCommunicationPort failed 0x%08X\n", status));
         return status;
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Communication port created (%wZ)\n", &portName));
+        "SentinelEDR: Communication port created (%wZ)\n", &portName));
 
     return STATUS_SUCCESS;
 }
@@ -137,7 +137,7 @@ SentinelCommsStop(VOID)
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Communication port closed\n"));
+        "SentinelEDR: Communication port closed\n"));
 }
 
 /* ── SentinelCommsSend ───────────────────────────────────────────────────── */
@@ -213,7 +213,7 @@ SentinelCommsSend(
 
     if (!NT_SUCCESS(status) && status != STATUS_TIMEOUT) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-            "SentinelPOC: FltSendMessage failed 0x%08X\n", status));
+            "SentinelEDR: FltSendMessage failed 0x%08X\n", status));
     }
 
     ExFreePoolWithTag(msg, SENTINEL_TAG_EVENT);
@@ -247,7 +247,7 @@ SentinelPortConnect(
     PAGED_CODE();
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Agent connected to communication port\n"));
+        "SentinelEDR: Agent connected to communication port\n"));
 
     /* Store client port for sending events */
     s_ClientPort = ClientPort;
@@ -268,7 +268,7 @@ SentinelPortDisconnect(
     PAGED_CODE();
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Agent disconnected from communication port\n"));
+        "SentinelEDR: Agent disconnected from communication port\n"));
 
     /* Close our handle to the client port */
     FltCloseClientPort(s_Filter, &s_ClientPort);

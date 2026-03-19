@@ -1,6 +1,6 @@
 /*
  * common/ipc_serialize.h
- * Serialization helpers for SentinelPOC IPC protocol.
+ * Serialization helpers for SentinelEDR IPC protocol.
  *
  * These functions serialize and deserialize IPC messages to/from a byte
  * buffer suitable for transmission over a named pipe or filter port.

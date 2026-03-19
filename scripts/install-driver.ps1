@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Install and start the SentinelPOC kernel driver.
+    Install and start the SentinelEDR kernel driver.
 
 .DESCRIPTION
     1. Verifies the driver binary exists
@@ -27,15 +27,15 @@
 param(
     [string]$DriverPath = "$PSScriptRoot\..\build\bin\Release\sentinel-drv.sys",
     [string]$ServiceName = "SentinelDrv",
-    [string]$DisplayName = "SentinelPOC Kernel Driver",
-    [string]$CertSubject = "CN=SentinelPOC Test Signing",
+    [string]$DisplayName = "SentinelEDR Kernel Driver",
+    [string]$CertSubject = "CN=SentinelEDR Test Signing",
     [string]$Altitude = "321000",
     [switch]$SkipSign
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== SentinelPOC Driver Install ===" -ForegroundColor Cyan
+Write-Host "=== SentinelEDR Driver Install ===" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Step 1: Verify driver binary ------------------------------------------------

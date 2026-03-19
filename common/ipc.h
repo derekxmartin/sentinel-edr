@@ -1,6 +1,6 @@
 /*
  * common/ipc.h
- * IPC protocol definitions for SentinelPOC.
+ * IPC protocol definitions for SentinelEDR.
  *
  * Two transport paths:
  *   1. Driver → Agent:  Filter communication port (FltCreateCommunicationPort)

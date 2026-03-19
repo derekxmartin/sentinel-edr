@@ -38,13 +38,13 @@ Traditional antivirus relies on static file signatures — it can only catch wha
 
 ### Why Build One?
 
-Understanding how an EDR works at the implementation level — kernel callbacks, inline hooks, filter drivers, ETW plumbing — is the fastest way to understand both what defenders can see and what attackers try to evade. SentinelPOC exists for exactly this purpose: a fully transparent, source-available EDR that security practitioners can study, modify, and experiment with.
+Understanding how an EDR works at the implementation level — kernel callbacks, inline hooks, filter drivers, ETW plumbing — is the fastest way to understand both what defenders can see and what attackers try to evade. SentinelEDR exists for exactly this purpose: a fully transparent, source-available EDR that security practitioners can study, modify, and experiment with.
 
 ---
 
 ## What It Does
 
-SentinelPOC instruments a Windows system at every layer — kernel callbacks, inline API hooks, ETW tracing, AMSI integration, and file system filtering — to collect security telemetry and detect adversary techniques in real time.
+SentinelEDR instruments a Windows system at every layer — kernel callbacks, inline API hooks, ETW tracing, AMSI integration, and file system filtering — to collect security telemetry and detect adversary techniques in real time.
 
 **Highlights:**
 
@@ -165,16 +165,16 @@ YARA files using unsupported modules (e.g., `cuckoo`, `androguard`) are automati
 
 ## Configuration
 
-The agent reads an INI-style config file at startup. Default location: `C:\SentinelPOC\sentinel.conf`. Override with `--config <path>`.
+The agent reads an INI-style config file at startup. Default location: `C:\SentinelEDR\sentinel.conf`. Override with `--config <path>`.
 
 Missing keys or a missing file gracefully fall back to compiled-in defaults.
 
 ```ini
 [paths]
-log_path        = C:\SentinelPOC\agent_events.jsonl
-amsi_dll        = C:\SentinelPOC\sentinel-amsi.dll
-rules_dir       = C:\SentinelPOC\rules
-yara_rules_dir  = C:\SentinelPOC\yara-rules
+log_path        = C:\SentinelEDR\agent_events.jsonl
+amsi_dll        = C:\SentinelEDR\sentinel-amsi.dll
+rules_dir       = C:\SentinelEDR\rules
+yara_rules_dir  = C:\SentinelEDR\yara-rules
 
 [scanner]
 max_file_size_mb   = 50      # Max file size for on-access YARA scan
@@ -296,30 +296,30 @@ Output binaries land in `build/bin/Release/`:
 
 ```powershell
 # Create the deployment directory
-New-Item -ItemType Directory -Force -Path C:\SentinelPOC
+New-Item -ItemType Directory -Force -Path C:\SentinelEDR
 
 # Copy binaries
-Copy-Item build\bin\Release\sentinel-agent.exe C:\SentinelPOC\
-Copy-Item build\bin\Release\sentinel-cli.exe   C:\SentinelPOC\
-Copy-Item build\bin\Release\sentinel-hook.dll   C:\SentinelPOC\
-Copy-Item build\bin\Release\sentinel-amsi.dll   C:\SentinelPOC\
+Copy-Item build\bin\Release\sentinel-agent.exe C:\SentinelEDR\
+Copy-Item build\bin\Release\sentinel-cli.exe   C:\SentinelEDR\
+Copy-Item build\bin\Release\sentinel-hook.dll   C:\SentinelEDR\
+Copy-Item build\bin\Release\sentinel-amsi.dll   C:\SentinelEDR\
 
 # Copy configuration
-Copy-Item sentinel.conf                         C:\SentinelPOC\
+Copy-Item sentinel.conf                         C:\SentinelEDR\
 
 # Copy rules
-Copy-Item -Recurse rules\       C:\SentinelPOC\rules\
-Copy-Item -Recurse yara-rules\  C:\SentinelPOC\yara-rules\
+Copy-Item -Recurse rules\       C:\SentinelEDR\rules\
+Copy-Item -Recurse yara-rules\  C:\SentinelEDR\yara-rules\
 ```
 
 ### 2. Install and start the kernel driver
 
 ```powershell
 # Copy the signed driver
-Copy-Item build\bin\Release\sentinel-drv.sys C:\SentinelPOC\
+Copy-Item build\bin\Release\sentinel-drv.sys C:\SentinelEDR\
 
 # Create the driver service
-sc.exe create SentinelDrv type=kernel binPath="C:\SentinelPOC\sentinel-drv.sys"
+sc.exe create SentinelDrv type=kernel binPath="C:\SentinelEDR\sentinel-drv.sys"
 
 # Start the driver
 sc.exe start SentinelDrv
@@ -331,13 +331,13 @@ sc.exe start SentinelDrv
 
 ```powershell
 # Run from an elevated command prompt
-C:\SentinelPOC\sentinel-agent.exe --console
+C:\SentinelEDR\sentinel-agent.exe --console
 ```
 
 With a custom config file:
 
 ```powershell
-C:\SentinelPOC\sentinel-agent.exe --console --config C:\SentinelPOC\sentinel.conf
+C:\SentinelEDR\sentinel-agent.exe --console --config C:\SentinelEDR\sentinel.conf
 ```
 
 The agent will:
@@ -355,7 +355,7 @@ Press **Ctrl+C** to stop cleanly.
 **Service mode** (for persistent deployment):
 
 ```powershell
-sc.exe create SentinelAgent binPath="C:\SentinelPOC\sentinel-agent.exe" start=auto
+sc.exe create SentinelAgent binPath="C:\SentinelEDR\sentinel-agent.exe" start=auto
 sc.exe start SentinelAgent
 ```
 
@@ -365,19 +365,19 @@ With the agent running, open a second terminal:
 
 ```powershell
 # Check agent health
-C:\SentinelPOC\sentinel-cli.exe status
+C:\SentinelEDR\sentinel-cli.exe status
 
 # View active configuration
-C:\SentinelPOC\sentinel-cli.exe config
+C:\SentinelEDR\sentinel-cli.exe config
 
 # List tracked processes
-C:\SentinelPOC\sentinel-cli.exe processes
+C:\SentinelEDR\sentinel-cli.exe processes
 
 # View network connections
-C:\SentinelPOC\sentinel-cli.exe connections
+C:\SentinelEDR\sentinel-cli.exe connections
 
 # Check recent alerts
-C:\SentinelPOC\sentinel-cli.exe alerts
+C:\SentinelEDR\sentinel-cli.exe alerts
 ```
 
 ---

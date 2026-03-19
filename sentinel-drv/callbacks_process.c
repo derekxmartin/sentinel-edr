@@ -98,14 +98,14 @@ SentinelProcessCallbackInit(VOID)
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: PsSetCreateProcessNotifyRoutineEx failed 0x%08X\n", status));
+            "SentinelEDR: PsSetCreateProcessNotifyRoutineEx failed 0x%08X\n", status));
         return status;
     }
 
     g_ProcessCallbackRegistered = TRUE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Process creation callback registered\n"));
+        "SentinelEDR: Process creation callback registered\n"));
 
     return STATUS_SUCCESS;
 }
@@ -127,7 +127,7 @@ SentinelProcessCallbackStop(VOID)
     g_ProcessCallbackRegistered = FALSE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Process creation callback unregistered\n"));
+        "SentinelEDR: Process creation callback unregistered\n"));
 }
 
 /* ── Callback implementation ─────────────────────────────────────────────── */
@@ -212,7 +212,7 @@ SentinelProcessNotifyCallback(
             );
 
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-                "SentinelPOC: Process CREATE PID=%lu PPID=%lu\n",
+                "SentinelEDR: Process CREATE PID=%lu PPID=%lu\n",
                 (ULONG)(ULONG_PTR)ProcessId,
                 (ULONG)(ULONG_PTR)CreateInfo->ParentProcessId));
 
@@ -232,7 +232,7 @@ SentinelProcessNotifyCallback(
             }
 
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-                "SentinelPOC: Process EXIT PID=%lu\n",
+                "SentinelEDR: Process EXIT PID=%lu\n",
                 (ULONG)(ULONG_PTR)ProcessId));
         }
 
@@ -241,7 +241,7 @@ SentinelProcessNotifyCallback(
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in process callback PID=%lu\n",
+            "SentinelEDR: Exception 0x%08X in process callback PID=%lu\n",
             GetExceptionCode(), (ULONG)(ULONG_PTR)ProcessId));
     }
 

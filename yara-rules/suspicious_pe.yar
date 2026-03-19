@@ -14,7 +14,7 @@
  *   - MITRE ATT&CK T1055 (Process Injection)
  *   - MITRE ATT&CK T1027.002 (Software Packing)
  *
- * SentinelPOC Phase 5, Task 4.
+ * SentinelEDR Phase 5, Task 4.
  */
 
 import "pe"
@@ -24,7 +24,7 @@ rule PE_RWX_Section
 {
     meta:
         description = "PE with Read-Write-Execute section (common in packed/injected code)"
-        author      = "SentinelPOC"
+        author      = "SentinelEDR"
         severity    = "Medium"
         mitre       = "T1027.002"
         phase       = "P5-T4"
@@ -43,7 +43,7 @@ rule PE_Process_Injection_Imports
 {
     meta:
         description = "PE importing classic process injection API combination"
-        author      = "SentinelPOC"
+        author      = "SentinelEDR"
         severity    = "High"
         mitre       = "T1055.001"
         phase       = "P5-T4"
@@ -79,7 +79,7 @@ rule PE_Suspicious_Section_Names
 {
     meta:
         description = "PE with section names associated with known packers or crypters"
-        author      = "SentinelPOC"
+        author      = "SentinelEDR"
         severity    = "Medium"
         mitre       = "T1027.002"
         phase       = "P5-T4"
@@ -113,7 +113,7 @@ rule PE_High_Entropy_Section
 {
     meta:
         description = "PE with high-entropy section suggesting encryption or packing"
-        author      = "SentinelPOC"
+        author      = "SentinelEDR"
         severity    = "Low"
         mitre       = "T1027.002"
         phase       = "P5-T4"

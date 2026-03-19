@@ -161,7 +161,7 @@ SentinelPipeEmitEvent(
         }
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in pipe FillProcessCtx\n",
+            "SentinelEDR: Exception 0x%08X in pipe FillProcessCtx\n",
             GetExceptionCode()));
     }
 
@@ -197,7 +197,7 @@ SentinelPipeEmitEvent(
             );
 
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: Pipe name resolved: %wZ\n",
+                "SentinelEDR: Pipe name resolved: %wZ\n",
                 &nameInfo->Name));
 
             /*
@@ -223,7 +223,7 @@ SentinelPipeEmitEvent(
                     event->Payload.Pipe.IsSuspicious = TRUE;
                     event->Severity = SentinelSeverityMedium;
                     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                        "SentinelPOC: SUSPICIOUS pipe detected!\n"));
+                        "SentinelEDR: SUSPICIOUS pipe detected!\n"));
                 }
             }
 
@@ -231,12 +231,12 @@ SentinelPipeEmitEvent(
             nameInfo = NULL;
         } else {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: FltGetFileNameInformation failed for pipe: 0x%08X\n",
+                "SentinelEDR: FltGetFileNameInformation failed for pipe: 0x%08X\n",
                 status));
         }
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in pipe name query\n",
+            "SentinelEDR: Exception 0x%08X in pipe name query\n",
             GetExceptionCode()));
     }
 
@@ -250,7 +250,7 @@ SentinelPipeEmitEvent(
 
     /* Send to agent */
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-        "SentinelPOC: Sending pipe event src=%d pid=%lu pipe=%S\n",
+        "SentinelEDR: Sending pipe event src=%d pid=%lu pipe=%S\n",
         event->Source,
         event->Payload.Pipe.CreatingProcessId,
         event->Payload.Pipe.PipeName));
@@ -288,7 +288,7 @@ SentinelPipeIsSuspicious(
 
             if (RtlCompareUnicodeString(&namePrefix, prefix, TRUE) == 0) {
                 KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                    "SentinelPOC: Suspicious pipe detected: %wZ\n", PipeName));
+                    "SentinelEDR: Suspicious pipe detected: %wZ\n", PipeName));
                 return TRUE;
             }
         }
@@ -328,7 +328,7 @@ SentinelPreCreateNamedPipe(
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-        "SentinelPOC: PreCreateNamedPipe hit! reqMode=%d pid=%lu\n",
+        "SentinelEDR: PreCreateNamedPipe hit! reqMode=%d pid=%lu\n",
         (int)Data->RequestorMode,
         FltGetRequestorProcessId(Data)));
 
@@ -351,13 +351,13 @@ SentinelPostCreateNamedPipe(
 
     if (!NT_SUCCESS(Data->IoStatus.Status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: PostCreateNamedPipe FAILED status=0x%08X\n",
+            "SentinelEDR: PostCreateNamedPipe FAILED status=0x%08X\n",
             Data->IoStatus.Status));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-        "SentinelPOC: PostCreateNamedPipe SUCCESS — emitting pipe event\n"));
+        "SentinelEDR: PostCreateNamedPipe SUCCESS — emitting pipe event\n"));
 
     SentinelPipeEmitEvent(Data, FltObjects);
 

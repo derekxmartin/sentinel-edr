@@ -9,7 +9,7 @@
  *   3. Searches for any signature substring match
  *   4. Returns AMSI_RESULT_DETECTED on match, NOT_DETECTED otherwise
  *
- * Signatures are loaded from C:\SentinelPOC\amsi_signatures.txt on first
+ * Signatures are loaded from C:\SentinelEDR\amsi_signatures.txt on first
  * Scan() call (lazy initialization to avoid file I/O in DllMain).
  *
  * Note: PowerShell's IAmsiStream requires 8-byte (ULONGLONG) buffers for
@@ -40,7 +40,7 @@ extern "C" const GUID IID_IAntimalwareProvider =
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
-#define SIGNATURE_FILE_PATH     "C:\\SentinelPOC\\amsi_signatures.txt"
+#define SIGNATURE_FILE_PATH     "C:\\SentinelEDR\\amsi_signatures.txt"
 #define MAX_SCAN_SIZE           (64 * 1024)     /* Cap at 64KB */
 
 /* ── DLL-wide ref count ─────────────────────────────────────────────────── */
@@ -184,7 +184,7 @@ SentinelAmsiProvider::DisplayName(LPWSTR* displayName)
 {
     if (!displayName) return E_POINTER;
 
-    const WCHAR name[] = L"SentinelPOC AMSI Provider";
+    const WCHAR name[] = L"SentinelEDR AMSI Provider";
     *displayName = (LPWSTR)CoTaskMemAlloc(sizeof(name));
     if (!*displayName) return E_OUTOFMEMORY;
 

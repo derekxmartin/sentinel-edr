@@ -33,7 +33,7 @@ main(int argc, char* argv[])
 
     /* Parse command-line arguments */
     bool consoleMode = false;
-    const char* configPath = "C:\\SentinelPOC\\sentinel.conf";
+    const char* configPath = "C:\\SentinelEDR\\sentinel.conf";
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--console") == 0) {
@@ -53,7 +53,7 @@ main(int argc, char* argv[])
     }
 
     if (consoleMode) {
-        std::printf("SentinelPOC Agent v%s\n", SENTINEL_VERSION);
+        std::printf("SentinelEDR Agent v%s\n", SENTINEL_VERSION);
         RunConsoleMode(g_AgentConfig);
         return 0;
     }
@@ -68,7 +68,7 @@ main(int argc, char* argv[])
         DWORD err = GetLastError();
         if (err == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
             /* Not running as a service — show usage */
-            std::printf("SentinelPOC Agent v%s\n", SENTINEL_VERSION);
+            std::printf("SentinelEDR Agent v%s\n", SENTINEL_VERSION);
             std::printf("Usage:\n");
             std::printf("  sentinel-agent.exe --console    "
                         "Run interactively (for debugging)\n");

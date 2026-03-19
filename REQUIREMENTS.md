@@ -1,4 +1,4 @@
-# SentinelPOC — Requirements Document v1.0
+# SentinelEDR — Requirements Document v1.0
 
 **A Proof-of-Concept Endpoint Detection & Response Agent for Windows x64**
 
@@ -385,7 +385,7 @@ All phases build into this monorepo layout. Phase 0 scaffolds it; subsequent pha
 
 **Files:** `sentinel-agent/amsi/amsi_provider.cpp`, `sentinel-agent/amsi/amsi_provider.h`, `sentinel-agent/amsi/amsi_register.cpp`
 
-**Acceptance Criteria:** Running `Invoke-Mimikatz` (or a test string signature) in PowerShell triggers an AMSI detection from the SentinelPOC provider. Benign scripts pass through clean.
+**Acceptance Criteria:** Running `Invoke-Mimikatz` (or a test string signature) in PowerShell triggers an AMSI detection from the SentinelEDR provider. Benign scripts pass through clean.
 
 ---
 

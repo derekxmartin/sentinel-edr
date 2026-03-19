@@ -35,7 +35,7 @@ public:
 
     /*
      * Initialize the YARA engine and compile rules from the given directory.
-     * rulesDir: path containing *.yar files (e.g., "C:\\SentinelPOC\\yara-rules").
+     * rulesDir: path containing *.yar files (e.g., "C:\\SentinelEDR\\yara-rules").
      * maxFileSize: skip files larger than this (bytes).
      * Returns true on success (even if zero rules loaded — not a fatal error).
      * Returns false if yr_initialize() fails.

@@ -21,7 +21,7 @@
 
 /*
  * Register the custom AMSI provider DLL in the registry.
- * dllPath: Full path to sentinel-amsi.dll (e.g., L"C:\\SentinelPOC\\sentinel-amsi.dll").
+ * dllPath: Full path to sentinel-amsi.dll (e.g., L"C:\\SentinelEDR\\sentinel-amsi.dll").
  * Returns true on success.
  */
 bool AmsiProviderRegister(const WCHAR* dllPath);

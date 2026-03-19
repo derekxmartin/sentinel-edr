@@ -335,7 +335,7 @@ SentinelPostCreate(
 
             if (isPipe) {
                 KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                    "SentinelPOC: PostCreate detected pipe path: %wZ\n",
+                    "SentinelEDR: PostCreate detected pipe path: %wZ\n",
                     &pipeNameInfo->Name));
             }
 
@@ -575,7 +575,7 @@ SentinelMinifilterEmitFileEvent(
         KeQuerySystemTimePrecise(&event->Timestamp);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in UUID/timestamp\n",
+            "SentinelEDR: Exception 0x%08X in UUID/timestamp\n",
             GetExceptionCode()));
     }
 
@@ -584,7 +584,7 @@ SentinelMinifilterEmitFileEvent(
         SentinelMinifilterFillProcessCtx(&event->ProcessCtx, Data);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in FillProcessCtx\n",
+            "SentinelEDR: Exception 0x%08X in FillProcessCtx\n",
             GetExceptionCode()));
     }
 
@@ -619,7 +619,7 @@ SentinelMinifilterEmitFileEvent(
         }
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in file name query\n",
+            "SentinelEDR: Exception 0x%08X in file name query\n",
             GetExceptionCode()));
     }
 
@@ -662,7 +662,7 @@ SentinelMinifilterEmitFileEvent(
             }
         } __except (EXCEPTION_EXECUTE_HANDLER) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: Exception 0x%08X in rename handling\n",
+                "SentinelEDR: Exception 0x%08X in rename handling\n",
                 GetExceptionCode()));
         }
     }
@@ -700,7 +700,7 @@ SentinelMinifilterEmitFileEvent(
             }
         } __except (EXCEPTION_EXECUTE_HANDLER) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: Exception 0x%08X in delete handling\n",
+                "SentinelEDR: Exception 0x%08X in delete handling\n",
                 GetExceptionCode()));
         }
     }

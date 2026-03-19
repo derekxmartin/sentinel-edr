@@ -31,7 +31,7 @@
 #define DIAG_LOG(fmt, ...) do {                                             \
     char _dbuf[300];                                                        \
     _snprintf_s(_dbuf, sizeof(_dbuf), _TRUNCATE, fmt, __VA_ARGS__);         \
-    HANDLE _hd = CreateFileA("C:\\SentinelPOC\\hook_diag.log",              \
+    HANDLE _hd = CreateFileA("C:\\SentinelEDR\\hook_diag.log",              \
         FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,              \
         NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);                   \
     if (_hd != INVALID_HANDLE_VALUE) {                                      \

@@ -91,7 +91,7 @@ SentinelThreadCallbackInit(VOID)
     if (!NT_SUCCESS(status)) {
         /* Fallback to legacy API */
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-            "SentinelPOC: PsSetCreateThreadNotifyRoutineEx failed 0x%08X, "
+            "SentinelEDR: PsSetCreateThreadNotifyRoutineEx failed 0x%08X, "
             "falling back to legacy API\n", status));
 
         status = PsSetCreateThreadNotifyRoutine(
@@ -100,7 +100,7 @@ SentinelThreadCallbackInit(VOID)
 
         if (!NT_SUCCESS(status)) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: PsSetCreateThreadNotifyRoutine failed 0x%08X\n",
+                "SentinelEDR: PsSetCreateThreadNotifyRoutine failed 0x%08X\n",
                 status));
             return status;
         }
@@ -109,7 +109,7 @@ SentinelThreadCallbackInit(VOID)
     g_ThreadCallbackRegistered = TRUE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Thread creation callback registered\n"));
+        "SentinelEDR: Thread creation callback registered\n"));
 
     return STATUS_SUCCESS;
 }
@@ -128,7 +128,7 @@ SentinelThreadCallbackStop(VOID)
     g_ThreadCallbackRegistered = FALSE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Thread creation callback unregistered\n"));
+        "SentinelEDR: Thread creation callback unregistered\n"));
 }
 
 /* -- Callback implementation ------------------------------------------------ */
@@ -214,14 +214,14 @@ SentinelThreadNotifyCallback(
 
         if (Create) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-                "SentinelPOC: Thread CREATE TID=%lu PID=%lu Creator=%lu%s\n",
+                "SentinelEDR: Thread CREATE TID=%lu PID=%lu Creator=%lu%s\n",
                 (ULONG)(ULONG_PTR)ThreadId,
                 (ULONG)(ULONG_PTR)ProcessId,
                 (ULONG)(ULONG_PTR)creatingPid,
                 isRemote ? " [REMOTE]" : ""));
         } else {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-                "SentinelPOC: Thread EXIT TID=%lu PID=%lu\n",
+                "SentinelEDR: Thread EXIT TID=%lu PID=%lu\n",
                 (ULONG)(ULONG_PTR)ThreadId,
                 (ULONG)(ULONG_PTR)ProcessId));
         }
@@ -231,7 +231,7 @@ SentinelThreadNotifyCallback(
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in thread callback TID=%lu PID=%lu\n",
+            "SentinelEDR: Exception 0x%08X in thread callback TID=%lu PID=%lu\n",
             GetExceptionCode(),
             (ULONG)(ULONG_PTR)ThreadId,
             (ULONG)(ULONG_PTR)ProcessId));

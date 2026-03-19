@@ -114,10 +114,10 @@ ConfigSetDefaults(SentinelConfig& cfg)
 {
     memset(&cfg, 0, sizeof(cfg));
 
-    strcpy_s(cfg.logPath,      "C:\\SentinelPOC\\agent_events.jsonl");
-    wcscpy_s(cfg.amsiDllPath,  L"C:\\SentinelPOC\\sentinel-amsi.dll");
-    strcpy_s(cfg.rulesDir,     "C:\\SentinelPOC\\rules");
-    strcpy_s(cfg.yaraRulesDir, "C:\\SentinelPOC\\yara-rules");
+    strcpy_s(cfg.logPath,      "C:\\SentinelEDR\\agent_events.jsonl");
+    wcscpy_s(cfg.amsiDllPath,  L"C:\\SentinelEDR\\sentinel-amsi.dll");
+    strcpy_s(cfg.rulesDir,     "C:\\SentinelEDR\\rules");
+    strcpy_s(cfg.yaraRulesDir, "C:\\SentinelEDR\\yara-rules");
 
     cfg.scanMaxFileSize    = 50 * 1024 * 1024;   /* 50 MB */
     cfg.scanMaxRegionSize  = 10 * 1024 * 1024;   /* 10 MB */

@@ -1,6 +1,6 @@
 /*
  * sentinel-cli/main.cpp
- * Console management tool for SentinelPOC.
+ * Console management tool for SentinelEDR.
  *
  * Communicates with the running sentinel-agent over
  * \\.\pipe\SentinelCommand using the IPC protocol defined in ipc.h.
@@ -43,7 +43,7 @@ static void
 PrintUsage()
 {
     std::printf(
-        "SentinelPOC CLI v1.0.0\n"
+        "SentinelEDR CLI v1.0.0\n"
         "\n"
         "Usage: sentinel-cli <command> [args] [--json]\n"
         "\n"
@@ -238,7 +238,7 @@ JsonGetValue(const std::string& json, const char* key)
 static void
 PrintStatus(const std::string& json)
 {
-    std::printf("SentinelPOC Agent Status\n");
+    std::printf("SentinelEDR Agent Status\n");
     std::printf("========================\n");
     std::printf("  Agent:       %s\n", JsonGetString(json, "agent").c_str());
     std::printf("  Uptime:      %s seconds\n", JsonGetValue(json, "uptime_s").c_str());
@@ -589,8 +589,8 @@ static int
 DoRulesUpdate(bool jsonOutput)
 {
     /* Default rule directories */
-    const std::string rulesDir     = "C:\\SentinelPOC\\rules";
-    const std::string yaraRulesDir = "C:\\SentinelPOC\\yara-rules";
+    const std::string rulesDir     = "C:\\SentinelEDR\\rules";
+    const std::string yaraRulesDir = "C:\\SentinelEDR\\yara-rules";
 
     struct RepoInfo {
         std::string dir;
@@ -742,8 +742,8 @@ DoRulesInit(int argc, char* argv[], bool jsonOutput)
         return 1;
     }
 
-    const std::string rulesDir     = "C:\\SentinelPOC\\rules";
-    const std::string yaraRulesDir = "C:\\SentinelPOC\\yara-rules";
+    const std::string rulesDir     = "C:\\SentinelEDR\\rules";
+    const std::string yaraRulesDir = "C:\\SentinelEDR\\yara-rules";
 
     struct CloneInfo {
         std::string url;
@@ -817,7 +817,7 @@ PrintConfig(const std::string& json)
     /* Extract nested values — "paths":{...}, "scanner":{...}, etc. */
     /* We reuse JsonGetString/JsonGetValue which work on the flat json string
        because our keys are unique across all sub-objects. */
-    std::printf("SentinelPOC Agent Configuration\n");
+    std::printf("SentinelEDR Agent Configuration\n");
     std::printf("================================\n");
 
     std::string configFile = JsonGetString(json, "config_file");

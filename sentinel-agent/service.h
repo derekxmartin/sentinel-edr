@@ -1,6 +1,6 @@
 /*
  * sentinel-agent/service.h
- * Windows service framework for the SentinelPOC agent.
+ * Windows service framework for the SentinelEDR agent.
  *
  * The agent runs as a Windows service (SERVICE_WIN32_OWN_PROCESS).
  * ServiceMain is registered with the SCM via StartServiceCtrlDispatcher.

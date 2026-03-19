@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Enable test-signing mode for SentinelPOC driver development.
+    Enable test-signing mode for SentinelEDR driver development.
 
 .DESCRIPTION
     Configures the system for loading test-signed kernel drivers:
@@ -18,14 +18,14 @@
 #>
 
 param(
-    [string]$CertSubject = "CN=SentinelPOC Test Signing",
+    [string]$CertSubject = "CN=SentinelEDR Test Signing",
     [string]$CertStoreLocation = "Cert:\CurrentUser\My",
     [string]$OutputDir = "$PSScriptRoot\..\certs"
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== SentinelPOC Test-Signing Setup ===" -ForegroundColor Cyan
+Write-Host "=== SentinelEDR Test-Signing Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Step 1: Enable test-signing --------------------------------------------------
@@ -58,7 +58,7 @@ if ($existingCert) {
         -Type CodeSigningCert `
         -CertStoreLocation $CertStoreLocation `
         -NotAfter (Get-Date).AddYears(5) `
-        -FriendlyName "SentinelPOC Driver Test Signing"
+        -FriendlyName "SentinelEDR Driver Test Signing"
 
     Write-Host "  Created certificate: $($cert.Thumbprint)" -ForegroundColor Green
 }
@@ -71,7 +71,7 @@ if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
-$certPath = Join-Path $OutputDir "SentinelPOC-TestSign.cer"
+$certPath = Join-Path $OutputDir "SentinelEDR-TestSign.cer"
 Export-Certificate -Cert $cert -FilePath $certPath -Force | Out-Null
 Write-Host "  Exported to: $certPath" -ForegroundColor Green
 

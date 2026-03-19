@@ -1,8 +1,8 @@
-# SentinelPOC AMSI String Signatures
+# SentinelEDR AMSI String Signatures
 # One pattern per line, case-insensitive substring match.
 # Lines starting with # are comments.
 #
-# Deploy to: C:\SentinelPOC\amsi_signatures.txt
+# Deploy to: C:\SentinelEDR\amsi_signatures.txt
 #
 # P7-T4: Custom AMSI Provider.
 

@@ -126,14 +126,14 @@ SentinelObjectCallbackInit(VOID)
     status = ObRegisterCallbacks(&cbReg, &g_ObRegistrationHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: ObRegisterCallbacks failed 0x%08X\n", status));
+            "SentinelEDR: ObRegisterCallbacks failed 0x%08X\n", status));
         return status;
     }
 
     g_ObjectCallbackRegistered = TRUE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Object handle callbacks registered (altitude %wZ)\n",
+        "SentinelEDR: Object handle callbacks registered (altitude %wZ)\n",
         &altitude));
 
     return STATUS_SUCCESS;
@@ -155,7 +155,7 @@ SentinelObjectCallbackStop(VOID)
     g_ObjectCallbackRegistered = FALSE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Object handle callbacks unregistered\n"));
+        "SentinelEDR: Object handle callbacks unregistered\n"));
 }
 
 /* ── Protected process check ────────────────────────────────────────────── */
@@ -297,7 +297,7 @@ SentinelObjectPreCallback(
         }
 
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-            "SentinelPOC: Object %s %s PID=%lu -> PID=%lu Access=0x%X\n",
+            "SentinelEDR: Object %s %s PID=%lu -> PID=%lu Access=0x%X\n",
             isProcessType ? "Process" : "Thread",
             (OperationInfo->Operation == OB_OPERATION_HANDLE_CREATE) ? "CREATE" : "DUPLICATE",
             (ULONG)(ULONG_PTR)sourcePid,
@@ -308,7 +308,7 @@ SentinelObjectPreCallback(
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in object callback PID=%lu -> PID=%lu\n",
+            "SentinelEDR: Exception 0x%08X in object callback PID=%lu -> PID=%lu\n",
             GetExceptionCode(),
             (ULONG)(ULONG_PTR)sourcePid,
             (ULONG)(ULONG_PTR)targetPid));

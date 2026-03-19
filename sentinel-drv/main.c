@@ -1,6 +1,6 @@
 /*
  * sentinel-drv/main.c
- * SentinelPOC kernel-mode WDM driver — entry point and lifecycle.
+ * SentinelEDR kernel-mode WDM driver — entry point and lifecycle.
  *
  * DriverEntry:
  *   1. Create device object + symbolic link
@@ -147,7 +147,7 @@ SentinelInstanceSetup(
      * attaches to the Named Pipe File System.
      */
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-        "SentinelPOC: InstanceSetup devType=0x%X fsType=%d%s\n",
+        "SentinelEDR: InstanceSetup devType=0x%X fsType=%d%s\n",
         (ULONG)VolumeDeviceType,
         (int)VolumeFilesystemType,
         (VolumeFilesystemType == FLT_FSTYPE_NPFS) ? " [NPFS!]" : ""));
@@ -171,7 +171,7 @@ DriverEntry(
     UNREFERENCED_PARAMETER(RegistryPath);
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: DriverEntry v%s [minifilter+comms+callbacks]\n", SENTINEL_VERSION));
+        "SentinelEDR: DriverEntry v%s [minifilter+comms+callbacks]\n", SENTINEL_VERSION));
 
     DriverObject->DriverUnload = SentinelUnload;
 
@@ -191,7 +191,7 @@ DriverEntry(
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: IoCreateDevice failed 0x%08X\n", status));
+            "SentinelEDR: IoCreateDevice failed 0x%08X\n", status));
         return status;
     }
 
@@ -202,7 +202,7 @@ DriverEntry(
     status = IoCreateSymbolicLink(&symlinkName, &deviceName);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: IoCreateSymbolicLink failed 0x%08X\n", status));
+            "SentinelEDR: IoCreateSymbolicLink failed 0x%08X\n", status));
         goto cleanup_device;
     }
 
@@ -216,7 +216,7 @@ DriverEntry(
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FltRegisterFilter failed 0x%08X\n", status));
+            "SentinelEDR: FltRegisterFilter failed 0x%08X\n", status));
         goto cleanup_symlink;
     }
 
@@ -225,7 +225,7 @@ DriverEntry(
     status = SentinelCommsInit(g_FilterHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelCommsInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelCommsInit failed 0x%08X\n", status));
         goto cleanup_filter;
     }
 
@@ -234,7 +234,7 @@ DriverEntry(
     status = SentinelProcessCallbackInit();
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelProcessCallbackInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelProcessCallbackInit failed 0x%08X\n", status));
         goto cleanup_comms;
     }
 
@@ -243,7 +243,7 @@ DriverEntry(
     status = SentinelThreadCallbackInit();
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelThreadCallbackInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelThreadCallbackInit failed 0x%08X\n", status));
         goto cleanup_process_cb;
     }
 
@@ -252,7 +252,7 @@ DriverEntry(
     status = SentinelObjectCallbackInit();
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelObjectCallbackInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelObjectCallbackInit failed 0x%08X\n", status));
         goto cleanup_thread_cb;
     }
 
@@ -261,7 +261,7 @@ DriverEntry(
     status = SentinelImageLoadCallbackInit();
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelImageLoadCallbackInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelImageLoadCallbackInit failed 0x%08X\n", status));
         goto cleanup_object_cb;
     }
 
@@ -270,7 +270,7 @@ DriverEntry(
     status = SentinelRegistryCallbackInit(DriverObject);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelRegistryCallbackInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelRegistryCallbackInit failed 0x%08X\n", status));
         goto cleanup_imageload_cb;
     }
 
@@ -279,7 +279,7 @@ DriverEntry(
     status = SentinelKapcInjectInit();
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelKapcInjectInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelKapcInjectInit failed 0x%08X\n", status));
         goto cleanup_registry_cb;
     }
 
@@ -288,7 +288,7 @@ DriverEntry(
     status = SentinelFileHashInit();
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelFileHashInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelFileHashInit failed 0x%08X\n", status));
         goto cleanup_kapc;
     }
 
@@ -297,7 +297,7 @@ DriverEntry(
     status = SentinelWfpInit(g_DeviceObject);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: SentinelWfpInit failed 0x%08X\n", status));
+            "SentinelEDR: SentinelWfpInit failed 0x%08X\n", status));
         goto cleanup_hash;
     }
 
@@ -306,12 +306,12 @@ DriverEntry(
     status = FltStartFiltering(g_FilterHandle);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: FltStartFiltering failed 0x%08X\n", status));
+            "SentinelEDR: FltStartFiltering failed 0x%08X\n", status));
         goto cleanup_wfp;
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Driver loaded successfully (stub callbacks)\n"));
+        "SentinelEDR: Driver loaded successfully (stub callbacks)\n"));
 
     return STATUS_SUCCESS;
 
@@ -375,7 +375,7 @@ SentinelUnload(
     PAGED_CODE();
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: DriverUnload\n"));
+        "SentinelEDR: DriverUnload\n"));
 
     /* Unregister minifilter (triggers SentinelFilterUnload which cleans up
        callbacks and comms) */
@@ -398,5 +398,5 @@ SentinelUnload(
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Driver unloaded\n"));
+        "SentinelEDR: Driver unloaded\n"));
 }

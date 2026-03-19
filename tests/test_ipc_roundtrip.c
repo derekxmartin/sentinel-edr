@@ -265,7 +265,7 @@ int main(void)
 {
     int failed = 0;
 
-    printf("=== SentinelPOC IPC Round-Trip Tests ===\n\n");
+    printf("=== SentinelEDR IPC Round-Trip Tests ===\n\n");
 
     failed += test_header_init_validate();
     failed += test_frame_write_read();

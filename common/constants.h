@@ -1,6 +1,6 @@
 /*
  * common/constants.h
- * Central constants for SentinelPOC — no magic numbers in any component.
+ * Central constants for SentinelEDR — no magic numbers in any component.
  *
  * This header is the single source of truth for device names, IOCTL codes,
  * minifilter altitude, WFP GUIDs, pool tags, and other system-level constants.
@@ -146,7 +146,7 @@
  * Generated as fixed values so they persist across driver reloads.
  */
 
-/* SentinelPOC WFP sublayer
+/* SentinelEDR WFP sublayer
  * {A1B2C3D4-E5F6-7890-ABCD-EF1234567890} */
 DEFINE_GUID(SENTINEL_WFP_SUBLAYER_GUID,
     0xA1B2C3D4, 0xE5F6, 0x7890,
@@ -314,7 +314,7 @@ DEFINE_GUID(SENTINEL_ETW_KERNEL_PROCESS,
 /* ── Custom AMSI Provider CLSID ─────────────────────────────────────────── */
 
 /*
- * SentinelPOC custom AMSI provider — registered via IAntimalwareProvider.
+ * SentinelEDR custom AMSI provider — registered via IAntimalwareProvider.
  * Windows loads this COM in-process server (sentinel-amsi.dll) into any
  * AMSI-instrumented application (PowerShell, VBScript, JScript).
  * {A3F5C8D2-7B1E-4A9F-8C6D-E5B2F1A47390}

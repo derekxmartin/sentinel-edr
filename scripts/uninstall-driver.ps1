@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Stop and uninstall the SentinelPOC kernel driver.
+    Stop and uninstall the SentinelEDR kernel driver.
 
 .DESCRIPTION
     1. Stops the driver service if running
@@ -25,7 +25,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== SentinelPOC Driver Uninstall ===" -ForegroundColor Cyan
+Write-Host "=== SentinelEDR Driver Uninstall ===" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Step 1: Stop driver ----------------------------------------------------------

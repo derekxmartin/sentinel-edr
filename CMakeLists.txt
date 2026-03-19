@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(SentinelPOC VERSION 1.0.0 LANGUAGES C CXX)
+project(SentinelEDR VERSION 1.0.0 LANGUAGES C CXX)
 
 # ── Global settings ──────────────────────────────────────────────────────────
 set(CMAKE_C_STANDARD 17)

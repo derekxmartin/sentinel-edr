@@ -8,7 +8,7 @@
  * All traffic is permitted — callouts never block.
  *
  * Book reference: Chapter 7 — Network Filter Drivers.
- * SentinelPOC Phase 6, Task 1.
+ * SentinelEDR Phase 6, Task 1.
  */
 
 #ifndef SENTINEL_WFP_CALLOUT_H

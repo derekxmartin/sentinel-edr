@@ -1,6 +1,6 @@
 /*
  * sentinel-agent/pipeline.h
- * Event processing pipeline for the SentinelPOC agent.
+ * Event processing pipeline for the SentinelEDR agent.
  *
  * Architecture:
  *   Driver port receiver thread  ──┐

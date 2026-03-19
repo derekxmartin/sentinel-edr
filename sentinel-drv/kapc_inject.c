@@ -111,7 +111,7 @@ ZwProtectVirtualMemory(
  * Path to sentinel-hook.dll on the target VM.
  * Must be deployed to this location before injection.
  */
-#define SENTINEL_HOOK_DLL_PATH  L"C:\\SentinelPOC\\sentinel-hook.dll"
+#define SENTINEL_HOOK_DLL_PATH  L"C:\\SentinelEDR\\sentinel-hook.dll"
 
 /* Maximum number of tracked injected PIDs (POC limit) */
 #define MAX_INJECTED_PIDS       1024
@@ -238,7 +238,7 @@ SentinelKapcInjectInit(VOID)
     g_KapcInitialized = TRUE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: KAPC injection initialized (hook DLL: %ls)\n",
+        "SentinelEDR: KAPC injection initialized (hook DLL: %ls)\n",
         SENTINEL_HOOK_DLL_PATH));
 
     return STATUS_SUCCESS;
@@ -257,7 +257,7 @@ SentinelKapcInjectStop(VOID)
     g_InjectedPidCount = 0;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: KAPC injection stopped\n"));
+        "SentinelEDR: KAPC injection stopped\n"));
 }
 
 /* ── Phase 1: Save ntdll base ──────────────────────────────────────────── */
@@ -337,7 +337,7 @@ SentinelKapcTryInject(
 
         if (SentinelIsExcludedProcess(process)) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-                "SentinelPOC: KAPC skip excluded PID=%lu\n",
+                "SentinelEDR: KAPC skip excluded PID=%lu\n",
                 (ULONG)(ULONG_PTR)ProcessId));
             __leave;
         }
@@ -359,7 +359,7 @@ SentinelKapcTryInject(
             PVOID ntdllBase = SentinelLookupNtdllBase(ProcessId);
             if (!ntdllBase) {
                 KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                    "SentinelPOC: No saved ntdll base for PID=%lu\n",
+                    "SentinelEDR: No saved ntdll base for PID=%lu\n",
                     (ULONG)(ULONG_PTR)ProcessId));
                 __leave;
             }
@@ -369,13 +369,13 @@ SentinelKapcTryInject(
 
         if (!ldrLoadDll) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                "SentinelPOC: Failed to resolve LdrLoadDll PID=%lu\n",
+                "SentinelEDR: Failed to resolve LdrLoadDll PID=%lu\n",
                 (ULONG)(ULONG_PTR)ProcessId));
             __leave;
         }
 
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-            "SentinelPOC: LdrLoadDll resolved at 0x%p for PID=%lu\n",
+            "SentinelEDR: LdrLoadDll resolved at 0x%p for PID=%lu\n",
             ldrLoadDll, (ULONG)(ULONG_PTR)ProcessId));
 
         /* ── Step 2: Allocate user-mode memory in target process ───────── */
@@ -398,7 +398,7 @@ SentinelKapcTryInject(
 
         if (!NT_SUCCESS(status)) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                "SentinelPOC: ZwAllocateVirtualMemory failed 0x%08X PID=%lu\n",
+                "SentinelEDR: ZwAllocateVirtualMemory failed 0x%08X PID=%lu\n",
                 status, (ULONG)(ULONG_PTR)ProcessId));
             __leave;
         }
@@ -414,7 +414,7 @@ SentinelKapcTryInject(
 
         if (!shellcodeEntry) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                "SentinelPOC: Shellcode write failed PID=%lu\n",
+                "SentinelEDR: Shellcode write failed PID=%lu\n",
                 (ULONG)(ULONG_PTR)ProcessId));
             /* Free the allocated region */
             regionSize = 0;
@@ -428,7 +428,7 @@ SentinelKapcTryInject(
             POOL_FLAG_NON_PAGED, KAPC_SIZE, SENTINEL_TAG_KAPC);
         if (!kapc) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                "SentinelPOC: KAPC allocation failed PID=%lu\n",
+                "SentinelEDR: KAPC allocation failed PID=%lu\n",
                 (ULONG)(ULONG_PTR)ProcessId));
             __leave;
         }
@@ -446,7 +446,7 @@ SentinelKapcTryInject(
 
         if (!KeInsertQueueApc(kapc, NULL, NULL, 0)) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                "SentinelPOC: KeInsertQueueApc failed PID=%lu\n",
+                "SentinelEDR: KeInsertQueueApc failed PID=%lu\n",
                 (ULONG)(ULONG_PTR)ProcessId));
             ExFreePoolWithTag(kapc, SENTINEL_TAG_KAPC);
             __leave;
@@ -464,12 +464,12 @@ SentinelKapcTryInject(
         SentinelRecordInjection(ProcessId);
 
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-            "SentinelPOC: KAPC queued for PID=%lu (shellcode=0x%p, LdrLoadDll=0x%p)\n",
+            "SentinelEDR: KAPC queued for PID=%lu (shellcode=0x%p, LdrLoadDll=0x%p)\n",
             (ULONG)(ULONG_PTR)ProcessId, shellcodeEntry, ldrLoadDll));
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in KAPC injection PID=%lu\n",
+            "SentinelEDR: Exception 0x%08X in KAPC injection PID=%lu\n",
             GetExceptionCode(), (ULONG)(ULONG_PTR)ProcessId));
     }
 
@@ -606,7 +606,7 @@ SentinelResolveLdrLoadDll(
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X resolving LdrLoadDll\n",
+            "SentinelEDR: Exception 0x%08X resolving LdrLoadDll\n",
             GetExceptionCode()));
     }
 
@@ -622,7 +622,7 @@ SentinelResolveLdrLoadDll(
  * Memory layout within the allocated page:
  *
  *   [0x000] UNICODE_STRING { Length, MaxLength, Buffer }
- *   [0x010] L"\\??\\C:\\SentinelPOC\\sentinel-hook.dll\0"
+ *   [0x010] L"\\??\\C:\\SentinelEDR\\sentinel-hook.dll\0"
  *   [0x200] x64 shellcode:
  *           sub  rsp, 0x28          ; 0x28 = shadow space (0x20) + alignment
  *           xor  ecx, ecx           ; arg1: SearchPath = NULL
@@ -744,7 +744,7 @@ SentinelAllocateAndWriteShellcode(
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-            "SentinelPOC: ZwProtectVirtualMemory failed 0x%08X\n", status));
+            "SentinelEDR: ZwProtectVirtualMemory failed 0x%08X\n", status));
         /* Continue anyway — RW memory is still executable on some configs */
     }
 

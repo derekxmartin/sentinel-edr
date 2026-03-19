@@ -1,6 +1,6 @@
 /*
  * common/telemetry.h
- * Canonical telemetry event schema for SentinelPOC.
+ * Canonical telemetry event schema for SentinelEDR.
  *
  * This header defines the SENTINEL_EVENT envelope and per-sensor payload
  * structures. It is shared across all components:

@@ -104,7 +104,7 @@ SentinelFileHashInit(VOID)
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: BCryptOpenAlgorithmProvider failed 0x%08X\n",
+            "SentinelEDR: BCryptOpenAlgorithmProvider failed 0x%08X\n",
             status));
         g_Sha256AlgHandle = NULL;
         return status;
@@ -113,7 +113,7 @@ SentinelFileHashInit(VOID)
     g_HashWorkItemsActive = 0;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: File hash subsystem initialized (SHA-256)\n"));
+        "SentinelEDR: File hash subsystem initialized (SHA-256)\n"));
 
     return STATUS_SUCCESS;
 }
@@ -135,7 +135,7 @@ SentinelFileHashStop(VOID)
         KeDelayExecutionThread(KernelMode, FALSE, &waitInterval);
         if (++spins > 50) {     /* 5 seconds max */
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                "SentinelPOC: Timed out waiting for %ld hash work items\n",
+                "SentinelEDR: Timed out waiting for %ld hash work items\n",
                 g_HashWorkItemsActive));
             break;
         }
@@ -147,7 +147,7 @@ SentinelFileHashStop(VOID)
     }
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: File hash subsystem stopped\n"));
+        "SentinelEDR: File hash subsystem stopped\n"));
 }
 
 /* ── Queue work item ────────────────────────────────────────────────────── */
@@ -365,7 +365,7 @@ SentinelFileHashWorkItemCb(
             event->Payload.File.FileSize = ctx->FileSize;
         } __except (EXCEPTION_EXECUTE_HANDLER) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: Exception 0x%08X in hash computation\n",
+                "SentinelEDR: Exception 0x%08X in hash computation\n",
                 GetExceptionCode()));
         }
     }
@@ -457,7 +457,7 @@ SentinelFileHashComputeSha256(
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-            "SentinelPOC: FltCreateFileEx failed 0x%08X for hash\n", status));
+            "SentinelEDR: FltCreateFileEx failed 0x%08X for hash\n", status));
         return status;
     }
 
@@ -516,7 +516,7 @@ SentinelFileHashComputeSha256(
     );
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: BCryptCreateHash failed 0x%08X\n", status));
+            "SentinelEDR: BCryptCreateHash failed 0x%08X\n", status));
         goto cleanup;
     }
 
@@ -548,7 +548,7 @@ SentinelFileHashComputeSha256(
         status = BCryptHashData(hHash, readBuffer, bytesRead, 0);
         if (!NT_SUCCESS(status)) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: BCryptHashData failed 0x%08X\n", status));
+                "SentinelEDR: BCryptHashData failed 0x%08X\n", status));
             goto cleanup;
         }
 
@@ -560,7 +560,7 @@ SentinelFileHashComputeSha256(
     status = BCryptFinishHash(hHash, rawHash, SHA256_HASH_SIZE, 0);
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: BCryptFinishHash failed 0x%08X\n", status));
+            "SentinelEDR: BCryptFinishHash failed 0x%08X\n", status));
         goto cleanup;
     }
 

@@ -110,14 +110,14 @@ SentinelImageLoadCallbackInit(VOID)
 
     if (!NT_SUCCESS(status)) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-            "SentinelPOC: PsSetLoadImageNotifyRoutineEx failed 0x%08X, "
+            "SentinelEDR: PsSetLoadImageNotifyRoutineEx failed 0x%08X, "
             "falling back to legacy API\n", status));
 
         status = PsSetLoadImageNotifyRoutine(SentinelImageLoadCallback);
 
         if (!NT_SUCCESS(status)) {
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "SentinelPOC: PsSetLoadImageNotifyRoutine failed 0x%08X\n",
+                "SentinelEDR: PsSetLoadImageNotifyRoutine failed 0x%08X\n",
                 status));
             return status;
         }
@@ -126,7 +126,7 @@ SentinelImageLoadCallbackInit(VOID)
     g_ImageLoadCallbackRegistered = TRUE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Image-load callback registered\n"));
+        "SentinelEDR: Image-load callback registered\n"));
 
     return STATUS_SUCCESS;
 }
@@ -145,7 +145,7 @@ SentinelImageLoadCallbackStop(VOID)
     g_ImageLoadCallbackRegistered = FALSE;
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
-        "SentinelPOC: Image-load callback unregistered\n"));
+        "SentinelEDR: Image-load callback unregistered\n"));
 }
 
 /* ── Callback implementation ────────────────────────────────────────────── */
@@ -311,7 +311,7 @@ SentinelImageLoadCallback(
         }
 
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
-            "SentinelPOC: ImageLoad PID=%lu Base=0x%p Size=0x%IX Signed=%d %wZ\n",
+            "SentinelEDR: ImageLoad PID=%lu Base=0x%p Size=0x%IX Signed=%d %wZ\n",
             (ULONG)(ULONG_PTR)ProcessId,
             ImageInfo->ImageBase,
             ImageInfo->ImageSize,
@@ -322,7 +322,7 @@ SentinelImageLoadCallback(
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-            "SentinelPOC: Exception 0x%08X in image-load callback PID=%lu\n",
+            "SentinelEDR: Exception 0x%08X in image-load callback PID=%lu\n",
             GetExceptionCode(),
             (ULONG)(ULONG_PTR)ProcessId));
     }
@@ -412,7 +412,7 @@ SentinelCheckImageSigned(
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-            "SentinelPOC: Exception checking PE signature: 0x%08X\n",
+            "SentinelEDR: Exception checking PE signature: 0x%08X\n",
             GetExceptionCode()));
     }
 

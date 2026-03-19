@@ -46,7 +46,7 @@ InstallAllHooks(void)
         _snprintf_s(buf, sizeof(buf), _TRUNCATE,
                     "SentinelHook: PID=%lu hooks=%d ready\r\n",
                     GetCurrentProcessId(), HookEngineGetInstallCount());
-        HANDLE hLog = CreateFileA("C:\\SentinelPOC\\hook_diag.log",
+        HANDLE hLog = CreateFileA("C:\\SentinelEDR\\hook_diag.log",
             FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
             NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hLog != INVALID_HANDLE_VALUE) {

@@ -1,0 +1,5 @@
+LIBRARY test_xll
+EXPORTS
+    xlAutoOpen
+    xlAutoClose
+    xlAutoAdd

@@ -97,19 +97,6 @@ IntegrityCheckThread(LPVOID param)
             }
         }
 
-        /* Log check result */
-        {
-            char msg[128];
-            int activeCount = 0;
-            for (int j = 0; j < AKESOEDR_MAX_HOOKS; j++) {
-                if (AkesoEDRIsHookActive(j)) activeCount++;
-            }
-            _snprintf_s(msg, sizeof(msg), _TRUNCATE,
-                "[AkesoEDR] Hook integrity: %d hooks intact, %d tampered\n",
-                activeCount - tamperedCount, tamperedCount);
-            OutputDebugStringA(msg);
-        }
-
         /* Also check ntdll .text integrity (detects full remap) */
         if (!AkesoEDRVerifyNtdllIntegrity()) {
             EmitTamperAlert("ntdll.dll", "ntdll .text section modified (remap?)");

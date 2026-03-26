@@ -20,4 +20,15 @@ set_target_properties(test_consumer PROPERTIES
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 
-message(STATUS "tests: Configured (ipc_roundtrip, test_consumer)")
+# ── XLL test payload (P10-T1) ───────────────────────────────────────────────
+# Excel XLL add-in with benign calc.exe shellcode for attack-chain testing.
+# Builds as a DLL with .xll suffix; exports xlAutoOpen via .def file.
+add_library(test_xll SHARED payloads/test_xll.cpp)
+target_link_libraries(test_xll PRIVATE kernel32)
+set_target_properties(test_xll PROPERTIES
+    SUFFIX ".xll"
+    LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/payloads/test_xll.def"
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+
+message(STATUS "tests: Configured (ipc_roundtrip, test_consumer, test_xll)")

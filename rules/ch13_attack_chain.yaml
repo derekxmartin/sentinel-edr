@@ -1,0 +1,234 @@
+# ============================================================================
+# Ch. 13 Attack Chain Detection Rules (P10-T3)
+#
+# Detection rules for all 8 phases of the "Evading EDR" Ch. 13 case study.
+# These rules fire during the P10-T2 attack_chain.ps1 automation script.
+#
+# ATT&CK mapping:
+#   Phase 1: T1137.006  Initial Access - Office Add-ins (XLL)
+#   Phase 2: T1059      Execution - Shellcode / Process Launch
+#   Phase 3: T1071.001  C2 - Application Layer Protocol (HTTP)
+#   Phase 4: T1546.001  Persistence - Preview Handler
+#   Phase 5: T1082      Discovery - System Information
+#   Phase 6: T1134      Privilege Escalation - Access Token Manipulation
+#   Phase 7: T1055.003  Lateral Movement - Remote Thread / Named Pipe
+#   Phase 8: T1041      Exfiltration - Exfiltration Over C2 Channel
+# ============================================================================
+
+---
+# Phase 1: Initial Access — XLL file written to user-writable path
+# Detects XLL files (Excel add-ins) being created or written outside
+# of trusted Office directories — a common initial access vector.
+name: "Ch13-P1: XLL file delivery"
+source: DriverMinifilter
+severity: high
+action: LOG
+conditions:
+  - field: payload.filePath
+    op: contains
+    value: .xll
+  - field: payload.operation
+    op: equals
+    value: Create
+
+---
+# Phase 2: Execution — Suspicious child process from Office application
+# Detects processes spawned by Excel, Word, or other Office apps.
+# Broader than excel_cmd_spawn.yaml — catches any child process.
+name: "Ch13-P2: Office child process"
+source: DriverProcess
+severity: high
+action: LOG
+conditions:
+  - field: process.parentImagePath
+    op: contains
+    value: Office
+
+---
+# Phase 2b: Execution — Process creation from uncommon parent
+# Detects notepad.exe or calc.exe spawned from PowerShell or cmd
+# (simulates shellcode launching a payload process).
+name: "Ch13-P2b: Payload process launch"
+source: DriverImageLoad
+severity: medium
+action: LOG
+conditions:
+  - field: payload.imagePath
+    op: contains
+    value: notepad.exe
+  - field: process.parentImagePath
+    op: contains
+    value: powershell.exe
+
+---
+# Phase 3: C2 Establishment — Outbound connection to external IP
+# Detects outbound network connections from non-browser processes.
+# In production, this would filter on known-bad IPs or unusual ports.
+name: "Ch13-P3: Outbound network connection"
+source: DriverNetwork
+severity: medium
+action: LOG
+conditions:
+  - field: payload.direction
+    op: equals
+    value: outbound
+  - field: payload.remotePort
+    op: equals
+    value: "80"
+
+---
+# Phase 4: Persistence — Shell extension / preview handler registry write
+# Detects writes to shellex registry keys, which are used for preview
+# handler persistence (Ch. 13 technique).
+name: "Ch13-P4: Preview handler persistence"
+source: DriverRegistry
+severity: high
+action: LOG
+conditions:
+  - field: payload.operation
+    op: equals
+    value: SetValue
+  - field: payload.keyPath
+    op: contains
+    value: shellex
+
+---
+# Phase 4b: Persistence — Suspicious CLSID registration
+# Detects new CLSID registrations that could indicate COM hijacking
+# or preview handler installation.
+name: "Ch13-P4b: CLSID registration"
+source: DriverRegistry
+severity: medium
+action: LOG
+conditions:
+  - field: payload.operation
+    op: equals
+    value: SetValue
+  - field: payload.keyPath
+    op: contains
+    value: Classes
+
+---
+# Phase 5: Reconnaissance — Rapid enumeration command execution
+# Detects a burst of short-lived processes typical of Seatbelt-style
+# host enumeration (whoami, net, systeminfo, ipconfig, etc.).
+type: threshold
+name: "Ch13-P5: Rapid enumeration"
+source: Etw
+severity: medium
+action: LOG
+threshold: 3
+window: 10000
+group_by: process
+conditions:
+  - field: payload.provider
+    op: equals
+    value: KernelProcess
+  - field: payload.eventId
+    op: equals
+    value: "1"
+
+---
+# Phase 5b: Reconnaissance — Known enumeration tool execution
+# Detects specific reconnaissance binaries by image path.
+name: "Ch13-P5b: Enumeration tool"
+source: DriverImageLoad
+severity: medium
+action: LOG
+conditions:
+  - field: payload.imagePath
+    op: contains
+    value: whoami.exe
+
+---
+# Phase 6: Privilege Escalation — Handle to privileged process
+# Detects OpenProcess calls targeting SYSTEM processes like
+# winlogon.exe, lsass.exe, or csrss.exe.
+name: "Ch13-P6: Privileged process access"
+source: DriverObject
+severity: critical
+action: LOG
+conditions:
+  - field: process.imagePath
+    op: contains
+    value: winlogon
+
+---
+# Phase 6b: Privilege Escalation — .NET assembly load (Add-Type)
+# Detects dynamic .NET compilation via Add-Type, commonly used
+# for in-memory privilege escalation tools.
+name: "Ch13-P6b: Dynamic .NET compilation"
+source: Etw
+severity: medium
+action: LOG
+conditions:
+  - field: payload.provider
+    op: equals
+    value: DotNETRuntime
+  - field: payload.assemblyName
+    op: contains
+    value: PrivEsc
+
+---
+# Phase 7: Lateral Movement — Suspicious named pipe creation
+# Detects named pipes matching known C2 framework patterns
+# (Cobalt Strike msagent_, postex_, MSSE-).
+name: "Ch13-P7: Suspicious named pipe"
+source: DriverMinifilter
+severity: high
+action: LOG
+conditions:
+  - field: payload.filePath
+    op: contains
+    value: msagent
+
+---
+# Phase 7b: Lateral Movement — Named pipe with C2 pattern
+# Broader pattern for post-exploitation pipe names.
+name: "Ch13-P7b: C2 pipe pattern"
+source: DriverMinifilter
+severity: high
+action: LOG
+conditions:
+  - field: payload.filePath
+    op: contains
+    value: postex_
+
+---
+# Phase 8: Exfiltration — Sensitive file staging in temp directory
+# Detects file creation in temp directories with suspicious naming
+# patterns that suggest data staging for exfiltration.
+name: "Ch13-P8: File staging in temp"
+source: DriverMinifilter
+severity: medium
+action: LOG
+conditions:
+  - field: payload.filePath
+    op: contains
+    value: exfil
+  - field: payload.operation
+    op: equals
+    value: Create
+
+---
+# Phase 8b: Exfiltration — Outbound connection following file write
+# Sequence: file write to temp → outbound network connection within 30s.
+# Indicates data staging followed by exfiltration attempt.
+type: sequence
+name: "Ch13-P8b: Stage and exfil"
+source: DriverMinifilter
+severity: high
+action: LOG
+time_window: 30000
+steps:
+  - conditions:
+    - field: payload.operation
+      op: equals
+      value: Write
+    - field: payload.filePath
+      op: contains
+      value: Temp
+  - conditions:
+    - field: source
+      op: equals
+      value: DriverNetwork

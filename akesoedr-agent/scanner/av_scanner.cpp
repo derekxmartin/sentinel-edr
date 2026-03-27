@@ -14,6 +14,31 @@
 #include <cstdio>
 #include <cstring>
 
+/* ── NT device path → Win32 path conversion ───────────────────────── */
+
+static bool
+NtPathToWin32(const WCHAR* ntPath, WCHAR* win32Path, size_t maxChars)
+{
+    WCHAR drive[3] = L"A:";
+    WCHAR target[512];
+
+    for (WCHAR letter = L'A'; letter <= L'Z'; letter++) {
+        drive[0] = letter;
+        if (QueryDosDeviceW(drive, target, _countof(target)) == 0)
+            continue;
+
+        size_t prefixLen = wcslen(target);
+        if (_wcsnicmp(ntPath, target, prefixLen) == 0 &&
+            ntPath[prefixLen] == L'\\') {
+            _snwprintf_s(win32Path, maxChars, _TRUNCATE,
+                         L"%s%s", drive, ntPath + prefixLen);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /* ── Init / Shutdown ──────────────────────────────────────────────── */
 
 bool
@@ -80,17 +105,20 @@ AVScanner::ScanFile(const AKESOEDR_FILE_EVENT& fileEvt,
     if (fileEvt.HashSkipped)
         return false;
 
-    /* Convert wide path to narrow for AV engine.
-     * The driver provides NT device paths (\Device\HarddiskVolume2\...),
-     * but the AV engine expects Win32 paths. We do a simple conversion
-     * for common volume mappings. */
-    char narrowPath[MAX_PATH * 2] = {};
-    WideCharToMultiByte(CP_UTF8, 0, fileEvt.FilePath, -1,
-                        narrowPath, sizeof(narrowPath), nullptr, nullptr);
+    /* Convert NT device path to Win32 path */
+    WCHAR win32Path[MAX_PATH] = {};
+    if (!NtPathToWin32(fileEvt.FilePath, win32Path, MAX_PATH))
+        return false;  /* Can't resolve — skip */
 
-    /* Skip NT device paths that we can't resolve — the on-access scanner
-     * already handles path conversion for YARA. For AV, we attempt the
-     * scan directly and let the AV engine handle it. */
+    /* Exclude agent's own files to avoid feedback loop */
+    if (wcsstr(win32Path, L"\\AkesoEDR\\") != nullptr ||
+        wcsstr(win32Path, L"\\AkesoAV\\") != nullptr)
+        return false;
+
+    /* Convert wide path to narrow for AV engine */
+    char narrowPath[MAX_PATH * 2] = {};
+    WideCharToMultiByte(CP_UTF8, 0, win32Path, -1,
+                        narrowPath, sizeof(narrowPath), nullptr, nullptr);
 
     AVTelemetry result = m_avEngine.scan_file(narrowPath);
 

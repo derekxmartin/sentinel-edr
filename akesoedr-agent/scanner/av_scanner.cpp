@@ -116,18 +116,20 @@ AVScanner::ScanFile(const AKESOEDR_FILE_EVENT& fileEvt,
         wcsstr(win32Path, L"\\AkesoAV") != nullptr)
         return false;
 
-    /* Skip directories and paths ending without an extension
-     * (likely directories resolved by the driver) */
+    /* Skip directories */
     DWORD attrs = GetFileAttributesW(win32Path);
     if (attrs == INVALID_FILE_ATTRIBUTES ||
         (attrs & FILE_ATTRIBUTE_DIRECTORY))
         return false;
 
-    /* Skip locked system files (UWP, WAL journals, etc.) */
-    if (wcsstr(win32Path, L"\\AppData\\Local\\Packages\\") != nullptr ||
-        wcsstr(win32Path, L".db-wal") != nullptr ||
-        wcsstr(win32Path, L".db-shm") != nullptr)
+    /* Verify we can actually open the file before sending to AV engine.
+     * Skips locked files (SQLite journals, UWP containers, etc.) */
+    HANDLE hTest = CreateFileW(win32Path, GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hTest == INVALID_HANDLE_VALUE)
         return false;
+    CloseHandle(hTest);
 
     /* Convert wide path to narrow for AV engine */
     char narrowPath[MAX_PATH * 2] = {};
